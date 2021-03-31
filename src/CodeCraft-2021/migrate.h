@@ -19,7 +19,7 @@ public:
 
     void migrate(int day, int limit, std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
         std::vector<int> pmIdList[2];
-        std::vector<int> pmIdListForOut[2];
+        std::vector<int> pmIdListForVMSelect[2];
 
         int migCnt = 0;
         bool finFlag = false;
@@ -27,13 +27,13 @@ public:
             for (auto &pm : aliveMachineList[i]) {
                 if (pm.second->empty()) continue;
                 pmIdList[i].push_back(pm.first);
-                pmIdListForOut[i].push_back(pm.first);
+                pmIdListForVMSelect[i].push_back(pm.first);
             }
 
-            sortPM(static_cast<VM::DeployType>(i), pmIdList[i]);
-            sortPMByUsedAmount(static_cast<VM::DeployType>(i), pmIdListForOut[i]);
+            sortPMByRemainAmount(static_cast<VM::DeployType>(i), pmIdList[i]);
+            sortPMByUsedAmount(static_cast<VM::DeployType>(i), pmIdListForVMSelect[i]);
 /*
-            for(auto it:pmIdListForOut[i]){
+            for(auto it:pmIdListForVMSelect[i]){
                 fprintf(stderr,"%s %d %d %lf %d %lf\n",aliveMachineList[i][it]->model.c_str(),it,aliveMachineList[i][it]->cpu - aliveMachineList[i][it]->getLeftCPU(), 1-aliveMachineList[i][it]->getCPUUsage(), aliveMachineList[i][it]->memory- aliveMachineList[i][it]->getLeftMemory(),1-aliveMachineList[i][it]->getMemoryUsage());
             }
             */
@@ -47,24 +47,24 @@ public:
         for (;;) {
             int i = -1;
             int outPMId = -1;
-            if (onePnt >= pmIdListForOut[0].size() && twoPnt >= pmIdList[1].size()) break;
+            if (onePnt >= pmIdListForVMSelect[0].size() && twoPnt >= pmIdList[1].size()) break;
 
-            if (onePnt >= pmIdListForOut[0].size()) {
-                outPMId = pmIdListForOut[1][twoPnt++];
+            if (onePnt >= pmIdListForVMSelect[0].size()) {
+                outPMId = pmIdListForVMSelect[1][twoPnt++];
                 i = 1;
             } else if (twoPnt >= pmIdList[1].size()) {
-                outPMId = pmIdListForOut[0][onePnt++];
+                outPMId = pmIdListForVMSelect[0][onePnt++];
                 i = 0;
             } else {
-                auto pmOneNode = aliveMachineList[0][pmIdListForOut[0][onePnt]];
-                auto pmTwoNode = aliveMachineList[1][pmIdListForOut[1][twoPnt]];
+                auto pmOneNode = aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
+                auto pmTwoNode = aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
 
                 if ((pmOneNode->cpu-pmOneNode->getLeftCPU() + (pmOneNode->memory-pmOneNode->getLeftMemory()) * MEMORY_PARA) <
                     (pmTwoNode->cpu-pmTwoNode->getLeftCPU() + (pmTwoNode->memory-pmTwoNode->getLeftMemory()) * MEMORY_PARA)) {
-                    outPMId = pmIdListForOut[0][onePnt++];
+                    outPMId = pmIdListForVMSelect[0][onePnt++];
                     i = 0;
                 } else {
-                    outPMId = pmIdListForOut[1][twoPnt++];
+                    outPMId = pmIdListForVMSelect[1][twoPnt++];
                     i = 1;
                 }
             }
@@ -140,7 +140,7 @@ private:
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
 
-    int sortPM(VMType::DeployType deployType, std::vector<int> &pmIdList) {
+    int sortPMByRemainAmount(VMType::DeployType deployType, std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [deployType, this](int &pmIdi, int &pmIdj) {
 
@@ -190,7 +190,6 @@ private:
     }
 
     int findPM(std::vector<int> &pmIdList, int outPmID, VM *vm, VMType::DeployType deployType, int &type, int &pos) {
-        //fprintf(stderr,"curvm %d %d\n",vm->cpu,vm->memory);
         int targetPMId = -1;
         int targetType = -1;
         int position = -1;
@@ -212,9 +211,10 @@ private:
         int curMinimalRemainder = outPM->getLeftCPU()*FIND_PM_REMAIN_CPU_WRIGHT[Server::DUAL_NODE] + outPM->getLeftMemory()*FIND_PM_REMAIN_MEMORY_WRIGHT[Server::DUAL_NODE];
         int minusCnt = 0;
         int findCnt = 0;
-        
+        int step = 1;
         if (deployType == VMType::DUAL){
-            for (int i = pmIdList.size() - 1 - ans; i >= 0 && targetPMId < 0; i--) {
+            for (int i = pmIdList.size() - 1 - ans; i >= 0; i-=step++) {
+                step = std::max(1, std::min(step, 2));
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
                 if (*curPMId == outPmID) continue;
@@ -225,21 +225,26 @@ private:
                 if (curPM->empty()) continue;
 
                 int remainResourceWeightedSum = INT32_MAX;
-                if (curPM->canDeployVM(vm) && curPM->getCategory(Server::DUAL_NODE) == vm->category) {
-                    remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
-                    findCnt++;
-                    if (remainResourceWeightedSum < curMinimalRemainder) {
-                        targetPMId = curPM->id;
-                        targetType = Server::DUAL_NODE;
-                        position = i;
-                        curMinimalRemainder = remainResourceWeightedSum;
-                        minusCnt++;
-                    }
-                } 
+                if (curPM->canDeployVM(vm)) {
+                    step = 1;
+                    if(curPM->getCategory(Server::DUAL_NODE) == vm->category) {
+                        remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
+                        //findCnt++;
+                        //step = 1;
+                        if (remainResourceWeightedSum < curMinimalRemainder) {
+                            targetPMId = curPM->id;
+                            targetType = Server::DUAL_NODE;
+                            position = i;
+                            curMinimalRemainder = remainResourceWeightedSum;
+                            minusCnt++;
+                        }
+                    } 
+                }
             }
         }
         else if(deployType == VMType::SINGLE) {
-            for (int i = pmIdList.size() - 1 - ans; i >= 0 && targetPMId < 0; i--) {
+            for (int i = pmIdList.size() - 1 - ans; i >= 0; i-=step++) {
+                step = std::max(1, std::min(step, 2));
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
                 if (*curPMId == outPmID) continue;
@@ -249,34 +254,49 @@ private:
                 if (curPM->empty()) continue;
 
                 int remainResourceWeightedSum = INT32_MAX;
-                    bool FlagA = curPM->canDeployVM(vm, Server::NODE_0);
-                    if (curPM->getCategory(Server::NODE_0) != vm->category) FlagA = false;
-                    bool FlagB = curPM->canDeployVM(vm, Server::NODE_1);
-                    if (curPM->getCategory(Server::NODE_1) != vm->category) FlagB = false;
-
-                    if (FlagA) {
-                        findCnt++;
-                        remainResourceWeightedSum =
-                        getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
-                        if (remainResourceWeightedSum < curMinimalRemainder) {
-                            targetPMId = curPM->id;
-                            targetType = Server::NODE_0;
-                            position = i;
-                            curMinimalRemainder = remainResourceWeightedSum;
-                            minusCnt++;
-                        }
-                    } else if (FlagB) {
-                        findCnt++;
-                        remainResourceWeightedSum =
-                        getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
-                        if (remainResourceWeightedSum < curMinimalRemainder) {
-                            targetPMId = curPM->id;
-                            targetType = Server::NODE_1;
-                            position = i;
-                            curMinimalRemainder = remainResourceWeightedSum;
-                            minusCnt++;
-                        }
+                
+                bool FlagA = false, FlagB = false;
+                if (curPM->canDeployVM(vm, Server::NODE_0)) {
+                    //step = std::max(1,step-1);
+                    step = 1;
+                    if (curPM->getCategory(Server::NODE_0) == vm->category){
+                        FlagA = true;
+                        //step = 1;
                     }
+                }
+                if (curPM->canDeployVM(vm, Server::NODE_1)) {
+                    //step = std::max(1,step-1);
+                    step = 1;
+                    if (curPM->getCategory(Server::NODE_1) == vm->category){
+                        FlagB = true;
+                        //step = 1;
+                    }
+                }
+
+                if (FlagA) {
+                    //findCnt++;
+                    remainResourceWeightedSum =
+                    getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
+                    if (remainResourceWeightedSum < curMinimalRemainder) {
+                        targetPMId = curPM->id;
+                        targetType = Server::NODE_0;
+                        position = i;
+                        curMinimalRemainder = remainResourceWeightedSum;
+                        minusCnt++;
+                    }
+                }
+                if (FlagB) {
+                    //findCnt++;
+                    remainResourceWeightedSum =
+                    getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
+                    if (remainResourceWeightedSum < curMinimalRemainder) {
+                        targetPMId = curPM->id;
+                        targetType = Server::NODE_1;
+                        position = i;
+                        curMinimalRemainder = remainResourceWeightedSum;
+                        minusCnt++;
+                    }
+                }
                 //if(minusCnt > 3 ) break;
             }
         }
