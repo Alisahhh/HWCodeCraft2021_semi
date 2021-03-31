@@ -201,7 +201,12 @@ private:
         idx = line.find(',', lastIdx + 1);
         int id = atoi(line.substr(lastIdx, idx - lastIdx).c_str());
 
-        return new Query(++addQueryIDCount, day, type, id, model);
+        int queryID = 0;
+        if (type == Query::Type::ADD) {
+            queryID = ++addQueryIDCount;
+        }
+
+        return new Query(queryID, day, type, id, model);
     }
 
     static Query::Type parseType(const std::string &str) {
