@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#define TEST
+
 // **参数说明**
 // 判断此服务器型号的 cpu / memory 比值：
 //   MORE_CPU_RATIO: 高于此比值分类为 MORE_CPU
