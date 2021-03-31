@@ -227,7 +227,7 @@ private:
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
                     step = 1;
-                    if(curPM->getCategory(Server::DUAL_NODE) == vm->category) {
+                    if(true || curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
                         //findCnt++;
                         //step = 1;
@@ -259,7 +259,7 @@ private:
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
                     //step = std::max(1,step-1);
                     step = 1;
-                    if (curPM->getCategory(Server::NODE_0) == vm->category){
+                    if (true || curPM->getCategory(Server::NODE_0) == vm->category){
                         FlagA = true;
                         //step = 1;
                     }
@@ -267,7 +267,7 @@ private:
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
                     //step = std::max(1,step-1);
                     step = 1;
-                    if (curPM->getCategory(Server::NODE_1) == vm->category){
+                    if (true || curPM->getCategory(Server::NODE_1) == vm->category){
                         FlagB = true;
                         //step = 1;
                     }
