@@ -173,11 +173,12 @@ private:
                   auto pmi = aliveMachineList[deployType][pmIdi];
                   auto pmj = aliveMachineList[deployType][pmIdj];
 
-                  return (std::min(pmi->cpu - pmi->getLeftCPU(),
-                          (pmi->memory - pmi->getLeftMemory())*3) <
-                         std::min(pmj->cpu - pmj->getLeftCPU(),
-                          (pmj->memory - pmj->getLeftMemory())*3));
+                  return (pmi->cpu - pmi->getLeftCPU()+
+                          (pmi->memory - pmi->getLeftMemory()) * MEMORY_PARA <
+                         pmj->cpu - pmj->getLeftCPU()+
+                          (pmj->memory - pmj->getLeftMemory()) * MEMORY_PARA);
                 });
+
       return pmIdList.size();
     }
 
@@ -225,17 +226,16 @@ private:
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm) && curPM->getCategory(Server::DUAL_NODE) == vm->category) {
-                remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
-                findCnt++;
-                if (remainResourceWeightedSum < curMinimalRemainder) {
-                    targetPMId = curPM->id;
-                    targetType = Server::DUAL_NODE;
-                    position = i;
-                    curMinimalRemainder = remainResourceWeightedSum;
-                    minusCnt++;
-                }
+                    remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
+                    findCnt++;
+                    if (remainResourceWeightedSum < curMinimalRemainder) {
+                        targetPMId = curPM->id;
+                        targetType = Server::DUAL_NODE;
+                        position = i;
+                        curMinimalRemainder = remainResourceWeightedSum;
+                        minusCnt++;
+                    }
                 } 
-                if(minusCnt > 3) break;
             }
         }
         else if(deployType == VMType::SINGLE) {
@@ -277,7 +277,7 @@ private:
                             minusCnt++;
                         }
                     }
-                if(minusCnt > 3 ) break;
+                //if(minusCnt > 3 ) break;
             }
         }
 
