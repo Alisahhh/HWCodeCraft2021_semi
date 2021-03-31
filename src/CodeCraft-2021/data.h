@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-#define TEST
+// #define TEST
 
 // **参数说明**
 // 判断此服务器型号的 cpu / memory 比值：
