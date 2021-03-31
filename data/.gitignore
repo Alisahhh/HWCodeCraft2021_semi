@@ -1,2 +1,2 @@
-test.ans
-training-1.out.txt
+*.ans
+*.out.txt
