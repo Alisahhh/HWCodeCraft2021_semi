@@ -133,8 +133,8 @@ public:
 private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
-    const double MEMORY_PARA = 0.3;
-    const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.3, 0.3, 0.3, 0.3, 0.3};
+    const double MEMORY_PARA = 0.4;
+    const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
     const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     std::unordered_map<int, Server *> *aliveMachineList;
@@ -211,10 +211,9 @@ private:
         int curMinimalRemainder = outPM->getLeftCPU()*FIND_PM_REMAIN_CPU_WRIGHT[Server::DUAL_NODE] + outPM->getLeftMemory()*FIND_PM_REMAIN_MEMORY_WRIGHT[Server::DUAL_NODE];
         int minusCnt = 0;
         int findCnt = 0;
-        int step = 1;
+
         if (deployType == VMType::DUAL){
-            for (int i = pmIdList.size() - 1 - ans; i >= 0; i-=step++) {
-                step = std::max(1, std::min(step, 2));
+            for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
                 if (*curPMId == outPmID) continue;
@@ -226,7 +225,6 @@ private:
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
-                    step = 1;
                     if(true || curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
                         //findCnt++;
@@ -243,8 +241,7 @@ private:
             }
         }
         else if(deployType == VMType::SINGLE) {
-            for (int i = pmIdList.size() - 1 - ans; i >= 0; i-=step++) {
-                step = std::max(1, std::min(step, 2));
+            for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
                 if (*curPMId == outPmID) continue;
@@ -257,16 +254,12 @@ private:
                 
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
-                    //step = std::max(1,step-1);
-                    step = 1;
                     if (true || curPM->getCategory(Server::NODE_0) == vm->category){
                         FlagA = true;
                         //step = 1;
                     }
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
-                    //step = std::max(1,step-1);
-                    step = 1;
                     if (true || curPM->getCategory(Server::NODE_1) == vm->category){
                         FlagB = true;
                         //step = 1;
