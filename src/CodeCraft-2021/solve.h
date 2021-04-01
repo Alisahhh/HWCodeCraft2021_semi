@@ -66,6 +66,7 @@ public:
 
             //auto queryList = queryListK[day % K];
             auto queryList = io->readDayQueries();
+            calcDailyResource(queryList);
             /*if (day != 1 && day + K - 1 <= T) {
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
@@ -193,13 +194,13 @@ private:
                           std::vector<Server *> &purchaseList) {
         bool canLocateFlag = false;
 
-        calcDailyResource(addQueryList);
+        calcQueryListResource(addQueryList);
 
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            volatile double param = 0.8;
-            if (isPeak) param = 0.3;
+            volatile double param = 1;
+            if (isPeak) param = 1;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
@@ -356,7 +357,7 @@ private:
     int dailyMaxCPU[2];
     int dailyMaxMem[2];
 
-    void calcDailyResource(const std::vector<std::pair<VMType *, Query *>> &addQueryList) {
+    void calcQueryListResource(const std::vector<std::pair<VMType *, Query *>> &addQueryList) {
         memset(dailyMaxCPU, 0, sizeof(dailyMaxCPU));
         memset(dailyMaxMem, 0, sizeof(dailyMaxMem));
         memset(dailyMaxCPUInPerType, 0, sizeof(dailyMaxCPUInPerType));
@@ -383,9 +384,42 @@ private:
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
         }
-        if (day == 134) {
-            // std::clog << dailyMaxCPU[0] + dailyMaxCPU[1] << std::endl;
-            // std::clog << dailyMaxMem[0] + dailyMaxMem[1] << std::endl;
+    }
+
+    void calcDailyResource(const std::vector<Query *> &queryList) {
+        memset(dailyMaxCPU, 0, sizeof(dailyMaxCPU));
+        memset(dailyMaxMem, 0, sizeof(dailyMaxMem));
+        memset(dailyMaxCPUInPerType, 0, sizeof(dailyMaxCPUInPerType));
+        memset(dailyMaxMemInPerType, 0, sizeof(dailyMaxMemInPerType));
+        int nowCPU[2][5], nowMem[2][5];
+        memset(nowCPU, 0, sizeof(nowCPU));
+        memset(nowMem, 0, sizeof(nowMem));
+
+        for (auto &query : queryList) {
+            if(query->type == Query::DEL) {
+                auto vm = VM::getVM(query->vmID);
+                nowCPU[vm->deployType][vm->category] -= vm->cpu;
+                nowMem[vm->deployType][vm->category] -= vm->memory;
+
+            } else {
+                auto vm = commonData->getVMType(query->vmModel);
+                nowCPU[vm->deployType][vm->category] += vm->cpu;
+                nowMem[vm->deployType][vm->category] += vm->memory;
+                int nowTotalCPU = 0, nowTotalMem = 0;
+                for (int j = 1; j <= 4; j++) {
+                    if (j == 3) continue;
+                    nowTotalCPU += nowCPU[vm->deployType][j];
+                    nowTotalMem += nowMem[vm->deployType][j];
+                }
+                dailyMaxCPU[vm->deployType] = std::max(dailyMaxCPU[vm->deployType], nowTotalCPU);
+                dailyMaxMem[vm->deployType] = std::max(dailyMaxMem[vm->deployType], nowTotalMem);
+                dailyMaxCPUInPerType[vm->deployType][vm->category] = std::max(
+                        dailyMaxCPUInPerType[vm->deployType][vm->category],
+                        nowCPU[vm->deployType][vm->category]);
+                dailyMaxMemInPerType[vm->deployType][vm->category] = std::max(
+                        dailyMaxMemInPerType[vm->deployType][vm->category],
+                        nowMem[vm->deployType][vm->category]);
+            }
         }
         if (dailyMaxCPU[0] + dailyMaxCPU[1] >= PEAK_CPU && dailyMaxMem[0] + dailyMaxMem[1] >= PEAK_MEM) {
             // std::clog << "PEAK DAY: " << day << std::endl;
@@ -420,6 +454,15 @@ private:
         if (lastNode->empty() != nowNode->empty()) {
             if (nowNode->empty()) return 1;
             if (lastNode->empty()) return -1;
+        }
+
+        if(lastNode->empty() && nowNode->empty()) {
+            if(lastNode->energyCost < nowNode->energyCost) {
+                return 1;
+            }
+            if(lastNode->energyCost > nowNode->energyCost) {
+                return -1;
+            }
         }
 
         if (deployNode == Server::DeployNode::DUAL_NODE) {
