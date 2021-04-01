@@ -231,8 +231,8 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (absKa < 0.5 && absKb < 0.5) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                                       } else {
                                           return fcmp(absKa - absKb) < 0;
                                       }
@@ -248,8 +248,8 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (absKa < 2 && absKb < 2) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                                       } else {
                                           return fcmp(absKa - absKb) < 0;
                                       }
@@ -265,8 +265,8 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                                       } else {
                                           return fcmp(absKa - absKb) < 0;
                                       }
