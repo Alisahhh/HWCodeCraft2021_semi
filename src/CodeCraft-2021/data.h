@@ -11,7 +11,12 @@
 #include <unordered_map>
 #include <vector>
 
-// #define TEST
+const double EPS = 1e-6;
+
+inline int fcmp(double a) {
+    if (fabs(a) <= EPS) return 0;
+    else return a < 0 ? -1 : 1;
+}
 
 // **参数说明**
 // 判断此服务器型号的 cpu / memory 比值：
@@ -64,14 +69,12 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        double cpuMemoryRatio = (double) cpu / memory;
-        _category = Category::SAME_SMALL; // 默认设置为小类型
-        if (cpuMemoryRatio > MORE_CPU_RATIO) {
+        volatile double cpuMemoryRatio = (double) cpu / memory;
+        _category = Category::SAME_LARGE; // 默认设置为 1
+        if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
-        } else if (cpuMemoryRatio < MORE_MEMORY_RATIO) {
+        } else if (fcmp(cpuMemoryRatio - MORE_MEMORY_RATIO) < 0) {
             _category = Category::MORE_MEMORY;
-        } else if (cpu >= SAME_LARGE_THR && memory >= SAME_LARGE_THR) {
-            _category = Category::SAME_LARGE;
         }
         return _category;
     }
@@ -171,11 +174,11 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        double cpuMemoryRatio = (double) cpu / memory;
+        volatile double cpuMemoryRatio = (double) cpu / memory;
         _category = Category::SAME_SMALL; // 默认设置为小类型
-        if (cpuMemoryRatio > MORE_CPU_RATIO) {
+        if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
-        } else if (cpuMemoryRatio < MORE_MEMORY_RATIO) {
+        } else if (fcmp(cpuMemoryRatio - MORE_MEMORY_RATIO) < 0) {
             _category = Category::MORE_MEMORY;
         } else if (cpu >= SAME_LARGE_THR && memory >= SAME_LARGE_THR) {
             _category = Category::SAME_LARGE;
@@ -289,9 +292,9 @@ public:
         }
         if (nowcpu == 0 && nowmem == 0) return Category::SAME_LARGE;
         if (nowmem == 0) return Category::MORE_CPU;
-        double k = (nowcpu + 0.0) / nowmem;
-        if (k >= MORE_CPU_RATIO) return Category::MORE_CPU;
-        else if (k <= MORE_MEMORY_RATIO) return Category::MORE_MEMORY;
+        volatile double k = (double) nowcpu / nowmem;
+        if (fcmp(k - MORE_CPU_RATIO) >= 0) return Category::MORE_CPU;
+        else if (fcmp(k - MORE_MEMORY_RATIO) <= 0) return Category::MORE_MEMORY;
         return Category::SAME_LARGE;
     }
 
