@@ -61,7 +61,8 @@ public:
             // migration
             if (VM::getVMCount() > 34 * 6) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                migrator->migrate(day, limit, migrationList);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList);
+                limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
             }
 
             //auto queryList = queryListK[day % K];
@@ -136,6 +137,10 @@ public:
             io->writePurchaseList(purchaseList);
             io->writeMigrationList(migrationList);
             io->writeDeployList(deployList);
+
+#ifdef TEST
+            checkUsedRate();
+#endif
         }
 #ifdef TEST
         endTime = clock();
@@ -465,5 +470,77 @@ private:
             }
             return 1;
         }
+    }
+
+    void checkUsedRate() {
+        int resourceTotalCPU[2] = {};
+        int resourceTotalMem[2] = {};
+        int resourceEmptyCPU[2] = {};
+        int resourceEmptyMem[2] = {};
+        int emptyMachine[2] = {};
+        for (int i = 0; i < 2; i++) {
+            for (auto &aliveM : aliveMachineList[i]) {
+                if (aliveM.second->empty()) {
+                    emptyMachine[i]++;
+                }
+                // if(aliveM.second.empty()) continue;
+                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                resourceTotalCPU[i] += aliveM.second->cpu;
+                resourceTotalMem[i] += aliveM.second->memory;
+
+            }
+        }
+        for (int i = 0; i < 2; i++) {
+            double cpuEmptyRate = 0;
+            double memEmptyRate = 0;
+
+            if (resourceTotalCPU[i])
+                cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
+            if (resourceTotalMem[i])
+                memEmptyRate = (resourceEmptyMem[i] + 0.0) / resourceTotalMem[i];
+
+            int cpuLowCnt = 0;
+            int cpuHighCnt = 0;
+            int memLowCnt = 0;
+            int memHighCnt = 0;
+            int dualLowCnt = 0;
+            int dualHighCnt = 0;
+
+            for(auto &pm:aliveMachineList[i]){
+                bool cpuHighFlag = false;
+                bool cpuLowFlag = false;
+                bool memHighFlag = false;
+                bool memLowFlag = false;
+
+                if (pm.second->empty()) continue;
+
+                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.1*pm.second->cpu) cpuHighFlag = true;
+                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) > 0.7*pm.second->cpu) cpuLowFlag = true;
+                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.1*pm.second->memory) memHighFlag = true;
+                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) > 0.7*pm.second->memory) memLowFlag = true;
+
+                if(cpuHighFlag && memHighFlag)
+                    dualHighCnt++;
+                else if(cpuLowFlag && memLowFlag)
+                    dualLowCnt++;
+                else{
+                    if(cpuLowFlag) cpuLowCnt++;
+                    else if(cpuHighFlag) cpuHighCnt++;
+                    
+                    if(memLowFlag) memLowCnt++;
+                    else if(memHighFlag) memHighCnt++;
+                }
+            }
+
+            std::clog << cpuEmptyRate << ", " << memEmptyRate << ", "
+                << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
+                << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
+                << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+        }
+
+        std::clog << std::endl;
     }
 };
