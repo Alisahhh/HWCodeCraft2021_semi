@@ -122,7 +122,7 @@ public:
                 delete query;
             }
 
-            #ifdef TEST
+#ifdef TEST
             for(int i = 0; i < 2;i ++) {
                 for(auto &aliveM : aliveMachineList[i] ) {
                     if(!aliveM.second->empty()) {
@@ -130,7 +130,7 @@ public:
                     }
                 }
             }
-            #endif
+#endif
 
             // IO
             io->writePurchaseList(purchaseList);
@@ -145,7 +145,7 @@ public:
         LOG_TIME_SEC(migTimeSum);
 
         std::clog << "Total Cost: " << totalCost << std::endl;
-        std::clog << "HardWare Cost: " << hardwareCost << std::endl; 
+        std::clog << "HardWare Cost: " << hardwareCost << std::endl;
 #endif
     }
 
@@ -168,7 +168,7 @@ private:
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
     static constexpr int PEAK_MEM = 30000;
-    
+
 
     static bool compareAddQuery(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
         auto vmA = a.first, vmB = b.first;
@@ -198,15 +198,15 @@ private:
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            double param = 0.8;
-            if(isPeak) param = 0.3;
+            volatile double param = 0.8;
+            if (isPeak) param = 0.3;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, param, &it, this](ServerType *a, ServerType *b) {
                               auto deployType = vm->deployType;
                               volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
-                                         dailyMaxMemInPerType[deployType][vm->category];
+                                                  dailyMaxMemInPerType[deployType][vm->category];
                               volatile double k1 = a->cpu / a->memory;
                               volatile double k2 = b->cpu / b->memory;
 
@@ -223,9 +223,10 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (absKa < 0.5 && absKb < 0.5) {
-                                          return a->hardwareCost + a->energyCost * (T - day) * param < b->hardwareCost + b->energyCost * (T - day) * param;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
-                                          return absKa < absKb;
+                                          return fcmp(absKa - absKb) < 0;
                                       }
                                   }
                               } else if (vm->category == Category::MORE_CPU) {
@@ -239,7 +240,8 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (absKa < 2 && absKb < 2) {
-                                           return a->hardwareCost + a->energyCost * (T - day) * param < b->hardwareCost + b->energyCost * (T - day) * param;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
                                           return absKa < absKb;
                                       }
@@ -254,10 +256,11 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (absKa < 0.2 && absKb < 0.2) {
-                                           return a->hardwareCost + a->energyCost * (T - day) * param < b->hardwareCost + b->energyCost * (T - day) * param;
+                                      if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
-                                          return absKa < absKb;
+                                          return fcmp(absKa - absKb) < 0;
                                       }
                                   }
 
@@ -318,10 +321,10 @@ private:
                 Server *aliveM = Server::newServer(*m);
                 aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                 purchaseList.push_back(aliveM);
-        #ifdef TEST
+#ifdef TEST
                 hardwareCost += aliveM->hardwareCost;
                 totalCost += aliveM->hardwareCost;
-        #endif
+#endif
                 if (vm->deployType == VMType::DUAL) {
                     if (aliveM->canDeployVM(vm)) {
                         aliveM->deploy(vm);
@@ -380,11 +383,11 @@ private:
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
         }
-        if(day == 134) {
+        if (day == 134) {
             // std::clog << dailyMaxCPU[0] + dailyMaxCPU[1] << std::endl;
             // std::clog << dailyMaxMem[0] + dailyMaxMem[1] << std::endl;
         }
-        if(dailyMaxCPU[0] + dailyMaxCPU[1] >= PEAK_CPU && dailyMaxMem[0] + dailyMaxMem[1] >= PEAK_MEM) {
+        if (dailyMaxCPU[0] + dailyMaxCPU[1] >= PEAK_CPU && dailyMaxMem[0] + dailyMaxMem[1] >= PEAK_MEM) {
             // std::clog << "PEAK DAY: " << day << std::endl;
             isPeak = true;
         } else {
