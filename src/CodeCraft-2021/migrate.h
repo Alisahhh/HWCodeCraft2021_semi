@@ -126,7 +126,7 @@ public:
             if (migCnt >= limit || finFlag) break;
         }
 #ifdef TEST
-        // std::clog << "limit: " << limit << " migCnt: " << migCnt << " tryCnt: " << tryCnt << std::endl;
+    std::clog << "limit: " << limit << " migCnt: " << migCnt << " tryCnt: " << tryCnt << std::endl;
 #endif
     }
 
@@ -208,7 +208,8 @@ private:
         }
         
         auto outPM = aliveMachineList[deployType][outPmID];
-        int curMinimalRemainder = outPM->getLeftCPU()*FIND_PM_REMAIN_CPU_WRIGHT[Server::DUAL_NODE] + outPM->getLeftMemory()*FIND_PM_REMAIN_MEMORY_WRIGHT[Server::DUAL_NODE];
+        //int curMinimalRemainder = outPM->getLeftCPU()*FIND_PM_REMAIN_CPU_WRIGHT[Server::DUAL_NODE] + outPM->getLeftMemory()*FIND_PM_REMAIN_MEMORY_WRIGHT[Server::DUAL_NODE];
+        int curMinimalRemainder = INT32_MAX;
         int minusCnt = 0;
         int findCnt = 0;
 
