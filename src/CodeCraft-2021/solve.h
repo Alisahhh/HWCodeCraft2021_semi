@@ -50,7 +50,11 @@ public:
         for (day = 1; day <= T; day++) {
 #ifdef TEST
             //if (day % 100 == 0) std::clog << "DAY " << day << std::endl;
-            std::clog << "Day " << day << " ServCnt: " << Server::getServerCount() << " VMCnt: " << VM::getVMCount() << std::endl;
+            std::clog << "Day " << day << " ServCnt: " << Server::getServerCount() << " VMCnt: " << VM::getVMCount()
+                      << std::endl;
+#endif
+#ifdef DEBUG_O3
+            //if (day > 30) exit(0);
 #endif
 
             // IO
@@ -97,6 +101,9 @@ public:
                         for (auto[vmType, query] : addQueryList) {
                             auto deployInfo = Server::getDeployInfo(query->vmID);
                             tmpDeployList.emplace_back(query->id, deployInfo);
+#ifdef DEBUG_O3
+                            //std::clog << "vm " << query->vmID << " deployed at server " << deployInfo.first->id << std::endl;
+#endif
                         }
                     }
                     std::sort(tmpDeployList.begin(), tmpDeployList.end());
@@ -124,9 +131,9 @@ public:
             }
 
 #ifdef TEST
-            for(int i = 0; i < 2;i ++) {
-                for(auto &aliveM : aliveMachineList[i] ) {
-                    if(!aliveM.second->empty()) {
+            for (int i = 0; i < 2; i++) {
+                for (auto &aliveM : aliveMachineList[i]) {
+                    if (!aliveM.second->empty()) {
                         totalCost += aliveM.second->energyCost;
                     }
                 }
@@ -179,11 +186,11 @@ private:
         if (vmA->category == Category::SAME_LARGE) {
             return (vmA->memory + vmA->cpu) > (vmB->memory + vmB->cpu);
         } else if (vmA->category == Category::MORE_CPU) {
-            return (vmA->memory + vmA->cpu * COMPARE_ADD_QUERY_RATIO) >
-                   (vmB->memory + vmB->cpu * COMPARE_ADD_QUERY_RATIO);
+            return fcmp((vmA->memory + vmA->cpu * COMPARE_ADD_QUERY_RATIO) -
+                        (vmB->memory + vmB->cpu * COMPARE_ADD_QUERY_RATIO)) > 0;
         } else {
-            return (vmA->memory * COMPARE_ADD_QUERY_RATIO + vmA->cpu) >
-                   (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu);
+            return fcmp((vmA->memory * COMPARE_ADD_QUERY_RATIO + vmA->cpu) -
+                   (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu)) > 0;
         }
     }
 
@@ -244,7 +251,7 @@ private:
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
-                                          return absKa < absKb;
+                                          return fcmp(absKa - absKb) < 0;
                                       }
                                   }
                               } else if (vm->category == Category::MORE_MEMORY) {
@@ -396,7 +403,7 @@ private:
         memset(nowMem, 0, sizeof(nowMem));
 
         for (auto &query : queryList) {
-            if(query->type == Query::DEL) {
+            if (query->type == Query::DEL) {
                 auto vm = VM::getVM(query->vmID);
                 nowCPU[vm->deployType][vm->category] -= vm->cpu;
                 nowMem[vm->deployType][vm->category] -= vm->memory;
@@ -456,11 +463,11 @@ private:
             if (lastNode->empty()) return -1;
         }
 
-        if(lastNode->empty() && nowNode->empty()) {
-            if(lastNode->energyCost < nowNode->energyCost) {
+        if (lastNode->empty() && nowNode->empty()) {
+            if (lastNode->energyCost < nowNode->energyCost) {
                 return 1;
             }
-            if(lastNode->energyCost > nowNode->energyCost) {
+            if (lastNode->energyCost > nowNode->energyCost) {
                 return -1;
             }
         }

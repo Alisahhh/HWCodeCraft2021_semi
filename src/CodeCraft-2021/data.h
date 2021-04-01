@@ -316,11 +316,11 @@ public:
         return nodes[node].leftMemory;
     }
 
-    double getCPUUsage(DeployNode node = DUAL_NODE) const {
+    volatile double getCPUUsage(DeployNode node = DUAL_NODE) const {
         return (double) getLeftCPU(node) / cpu;
     }
 
-    double getMemoryUsage(DeployNode node = DUAL_NODE) const {
+    volatile double getMemoryUsage(DeployNode node = DUAL_NODE) const {
         return (double) getLeftMemory(node) / memory;
     }
 

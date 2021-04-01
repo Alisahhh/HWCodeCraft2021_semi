@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <set>
+#include <iomanip>
 
 #include "data.h"
 #include "util.h"
@@ -47,20 +48,22 @@ public:
         for (;;) {
             int i = -1;
             int outPMId = -1;
-            if (onePnt >= pmIdListForVMSelect[0].size() && twoPnt >= pmIdList[1].size()) break;
+            if (onePnt >= pmIdListForVMSelect[0].size() && twoPnt >= pmIdListForVMSelect[1].size()) break;
 
             if (onePnt >= pmIdListForVMSelect[0].size()) {
                 outPMId = pmIdListForVMSelect[1][twoPnt++];
                 i = 1;
-            } else if (twoPnt >= pmIdList[1].size()) {
+            } else if (twoPnt >= pmIdListForVMSelect[1].size()) {
                 outPMId = pmIdListForVMSelect[0][onePnt++];
                 i = 0;
             } else {
                 auto pmOneNode = aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
                 auto pmTwoNode = aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
 
-                if ((pmOneNode->cpu-pmOneNode->getLeftCPU() + (pmOneNode->memory-pmOneNode->getLeftMemory()) * MEMORY_PARA) <
-                    (pmTwoNode->cpu-pmTwoNode->getLeftCPU() + (pmTwoNode->memory-pmTwoNode->getLeftMemory()) * MEMORY_PARA)) {
+                if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
+                     (pmOneNode->memory - pmOneNode->getLeftMemory()) * MEMORY_PARA) -
+                    (pmTwoNode->cpu - pmTwoNode->getLeftCPU() +
+                     (pmTwoNode->memory - pmTwoNode->getLeftMemory()) * MEMORY_PARA)) < 0) {
                     outPMId = pmIdListForVMSelect[0][onePnt++];
                     i = 0;
                 } else {
@@ -71,7 +74,11 @@ public:
 
             auto outPM = Server::getServer(outPMId);
             //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
-            if (outPM->getMemoryUsage() < 0.1 && outPM->getCPUUsage() < 0.1) continue;
+            volatile double thr = 0.1;
+#ifdef DEBUG_O3
+            std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
+#endif
+            if (fcmp(outPM->getMemoryUsage() - thr) < 0 && fcmp(outPM->getCPUUsage() - thr) < 0) continue;
 
             std::set<int> cacheVMIdList;
             auto vmList = Server::getServer(outPMId)->getAllDeployedVMs();
@@ -126,16 +133,16 @@ public:
             if (migCnt >= limit || finFlag) break;
         }
 #ifdef TEST
-    std::clog << "limit: " << limit << " migCnt: " << migCnt << " tryCnt: " << tryCnt << std::endl;
+        std::clog << "limit: " << limit << " migCnt: " << migCnt << " tryCnt: " << tryCnt << std::endl;
 #endif
     }
 
 private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
-    const double MEMORY_PARA = 0.4;
-    const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
-    const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
+    volatile const double MEMORY_PARA = 0.4;
+    volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
+    volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
@@ -147,10 +154,10 @@ private:
                       auto pmi = aliveMachineList[deployType][pmIdi];
                       auto pmj = aliveMachineList[deployType][pmIdj];
 
-                      return (pmi->getLeftCPU(Server::NODE_0) + pmi->getLeftCPU(Server::NODE_1) +
-                              (pmi->getLeftMemory(Server::NODE_0) + pmi->getLeftMemory(Server::NODE_1)) * MEMORY_PARA) >
+                      return fcmp((pmi->getLeftCPU(Server::NODE_0) + pmi->getLeftCPU(Server::NODE_1) +
+                              (pmi->getLeftMemory(Server::NODE_0) + pmi->getLeftMemory(Server::NODE_1)) * MEMORY_PARA) -
                              (pmj->getLeftCPU(Server::NODE_0) + pmj->getLeftCPU(Server::NODE_1) +
-                              (pmj->getLeftMemory(Server::NODE_0) + pmj->getLeftMemory(Server::NODE_1)) * MEMORY_PARA);
+                              (pmj->getLeftMemory(Server::NODE_0) + pmj->getLeftMemory(Server::NODE_1)) * MEMORY_PARA)) > 0;
                   });
         treeArray[deployType].setSize(pmIdList.size());
         for (int i = 1; i <= pmIdList.size(); i++) {
@@ -168,25 +175,24 @@ private:
     }
 
     int sortPMByUsedAmount(VMType::DeployType deployType, std::vector<int> &pmIdList) {
-      std::sort(pmIdList.begin(), pmIdList.end(),
-                [deployType, this](int &pmIdi, int &pmIdj) {
-                  auto pmi = aliveMachineList[deployType][pmIdi];
-                  auto pmj = aliveMachineList[deployType][pmIdj];
+        std::sort(pmIdList.begin(), pmIdList.end(),
+                  [deployType, this](int &pmIdi, int &pmIdj) {
+                      auto pmi = aliveMachineList[deployType][pmIdi];
+                      auto pmj = aliveMachineList[deployType][pmIdj];
 
-                  return (pmi->cpu - pmi->getLeftCPU()+
-                          (pmi->memory - pmi->getLeftMemory()) * MEMORY_PARA <
-                         pmj->cpu - pmj->getLeftCPU()+
-                          (pmj->memory - pmj->getLeftMemory()) * MEMORY_PARA);
-                });
+                      return fcmp((pmi->cpu - pmi->getLeftCPU() + (pmi->memory - pmi->getLeftMemory()) * MEMORY_PARA) -
+                                  (pmj->cpu - pmj->getLeftCPU() + (pmj->memory - pmj->getLeftMemory()) * MEMORY_PARA)) <
+                             0;
+                  });
 
-      return pmIdList.size();
+        return pmIdList.size();
     }
 
-    int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
-      return (pm->getLeftCPU(dn) - vm->cpu) *
-                 FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
-             (pm->getLeftMemory(dn) - vm->memory) *
-                 FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category];
+    volatile int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
+        return (pm->getLeftCPU(dn) - vm->cpu) *
+               FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
+               (pm->getLeftMemory(dn) - vm->memory) *
+               FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category];
     }
 
     int findPM(std::vector<int> &pmIdList, int outPmID, VM *vm, VMType::DeployType deployType, int &type, int &pos) {
@@ -206,14 +212,14 @@ private:
                 L = mid + 1;
             }
         }
-        
+
         auto outPM = aliveMachineList[deployType][outPmID];
         //int curMinimalRemainder = outPM->getLeftCPU()*FIND_PM_REMAIN_CPU_WRIGHT[Server::DUAL_NODE] + outPM->getLeftMemory()*FIND_PM_REMAIN_MEMORY_WRIGHT[Server::DUAL_NODE];
         int curMinimalRemainder = INT32_MAX;
         int minusCnt = 0;
         int findCnt = 0;
 
-        if (deployType == VMType::DUAL){
+        if (deployType == VMType::DUAL) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
@@ -226,7 +232,7 @@ private:
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
-                    if( curPM->getCategory(Server::DUAL_NODE) == vm->category) {
+                    if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
                         //findCnt++;
                         //step = 1;
@@ -237,11 +243,10 @@ private:
                             curMinimalRemainder = remainResourceWeightedSum;
                             minusCnt++;
                         }
-                    } 
+                    }
                 }
             }
-        }
-        else if(deployType == VMType::SINGLE) {
+        } else if (deployType == VMType::SINGLE) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
@@ -252,16 +257,16 @@ private:
                 if (curPM->empty()) continue;
 
                 int remainResourceWeightedSum = INT32_MAX;
-                
+
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
-                    if ( curPM->getCategory(Server::NODE_0) == vm->category){
+                    if (curPM->getCategory(Server::NODE_0) == vm->category) {
                         FlagA = true;
                         //step = 1;
                     }
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
-                    if ( curPM->getCategory(Server::NODE_1) == vm->category){
+                    if (curPM->getCategory(Server::NODE_1) == vm->category) {
                         FlagB = true;
                         //step = 1;
                     }
@@ -270,7 +275,7 @@ private:
                 if (FlagA) {
                     //findCnt++;
                     remainResourceWeightedSum =
-                    getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
+                            getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_0;
@@ -282,7 +287,7 @@ private:
                 if (FlagB) {
                     //findCnt++;
                     remainResourceWeightedSum =
-                    getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
+                            getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_1;
@@ -312,12 +317,12 @@ private:
         pm = aliveMachineList[deployType][inPmID];
         pm->deploy(vm, node);
 
-        #ifdef TEST2
+#ifdef TEST2
         auto outPm = aliveMachineList[deployType][outPmID];
         auto inPm = aliveMachineList[deployType][inPmID];
         fprintf(stderr, "%d %d %d %d %lf %lf %lf %lf\n", deployType, outPmID,
                 inPmID, vmID, 1-outPm->getCPUUsage(), 1-outPm->getMemoryUsage(),
                 1-inPm->getCPUUsage(), 1-inPm->getMemoryUsage());
-        #endif
+#endif
     }
 };
