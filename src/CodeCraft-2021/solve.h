@@ -181,13 +181,13 @@ private:
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, &it, this](ServerType *a, ServerType *b) {
                               auto deployType = vm->deployType;
-                              double k = dailyMaxCPUInPerType[deployType][vm->category] /
+                              volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
                                          dailyMaxMemInPerType[deployType][vm->category];
-                              double k1 = a->cpu / a->memory;
-                              double k2 = b->cpu / b->memory;
+                              volatile double k1 = a->cpu / a->memory;
+                              volatile double k2 = b->cpu / b->memory;
 
-                              double absKa = fabs(k1 - k);
-                              double absKb = fabs(k2 - k);
+                              volatile double absKa = fabs(k1 - k);
+                              volatile double absKb = fabs(k2 - k);
                               if (vm->category == Category::SAME_LARGE) {
                                   if (a->category != b->category) {
                                       if (a->category == vm->category) {
@@ -238,6 +238,7 @@ private:
                                   }
 
                               }
+                              throw std::logic_error("unexpected vm category");
                           });
             }
             canLocateFlag = false;
@@ -362,16 +363,16 @@ private:
             if (lastNode->getCategory(lastDeployNode) == vm->category) {
                 return 1;
             }
-            if (vm->category == 2 && lastNode->getCategory(lastDeployNode) == 4) {
+            if (vm->category == Category::MORE_CPU && lastNode->getCategory(lastDeployNode) == Category::MORE_MEMORY) {
                 return -1;
             }
-            if (vm->category == 2 && nowNode->getCategory(deployNode) == 4) {
+            if (vm->category == Category::MORE_CPU && nowNode->getCategory(deployNode) == Category::MORE_MEMORY) {
                 return 1;
             }
-            if (vm->category == 4 && lastNode->getCategory(lastDeployNode) == 2) {
+            if (vm->category == Category::MORE_MEMORY && lastNode->getCategory(lastDeployNode) == Category::MORE_CPU) {
                 return -1;
             }
-            if (vm->category == 4 && nowNode->getCategory(deployNode) == 2) {
+            if (vm->category == Category::MORE_MEMORY && nowNode->getCategory(deployNode) == Category::MORE_CPU) {
                 return 1;
             }
         }
@@ -381,17 +382,17 @@ private:
         }
 
         if (deployNode == Server::DeployNode::DUAL_NODE) {
-            if (nowNode->getLeftCPU(Server::NODE_0) <= lastNode->getLeftCPU(Server::NODE_0) &&
-                nowNode->getLeftMemory(Server::NODE_0) <= lastNode->getLeftMemory(Server::NODE_0)) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) <= 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) <= 0) {
                 return -1;
             }
-            if (nowNode->getLeftCPU(Server::NODE_0) > lastNode->getLeftCPU(Server::NODE_0) &&
-                nowNode->getLeftMemory(Server::NODE_0) > lastNode->getLeftMemory(Server::NODE_0)) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) > 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
                 return 1;
             }
-            double k = (double) vm->cpu / vm->memory;
-            if (nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k <=
-                lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k) {
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
+                     (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
                 return -1;
             }
             return 1;
@@ -417,8 +418,8 @@ private:
             if (nowCPU > lastCPU && nowMem > lastMem) {
                 return 1;
             }
-            double k = (double) vm->cpu / vm->memory;
-            if (nowCPU + nowMem * k <= lastCPU + lastMem * k) {
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
                 return -1;
             }
             return 1;

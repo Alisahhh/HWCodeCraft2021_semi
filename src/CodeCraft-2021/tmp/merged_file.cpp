@@ -26,6 +26,13 @@
 #include <unordered_map>
 #include <vector>
 
+const double EPS = 1e-6;
+
+inline int fcmp(double a) {
+    if (fabs(a) <= EPS) return 0;
+    else return a < 0 ? -1 : 1;
+}
+
 // **参数说明**
 // 判断此服务器型号的 cpu / memory 比值：
 //   MORE_CPU_RATIO: 高于此比值分类为 MORE_CPU
@@ -77,14 +84,12 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        double cpuMemoryRatio = (double) cpu / memory;
-        _category = Category::SAME_SMALL; // 默认设置为小类型
-        if (cpuMemoryRatio > MORE_CPU_RATIO) {
+        volatile double cpuMemoryRatio = (double) cpu / memory;
+        _category = Category::SAME_LARGE; // 默认设置为 1
+        if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
-        } else if (cpuMemoryRatio < MORE_MEMORY_RATIO) {
+        } else if (fcmp(cpuMemoryRatio - MORE_MEMORY_RATIO) < 0) {
             _category = Category::MORE_MEMORY;
-        } else if (cpu >= SAME_LARGE_THR && memory >= SAME_LARGE_THR) {
-            _category = Category::SAME_LARGE;
         }
         return _category;
     }
@@ -184,11 +189,11 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        double cpuMemoryRatio = (double) cpu / memory;
+        volatile double cpuMemoryRatio = (double) cpu / memory;
         _category = Category::SAME_SMALL; // 默认设置为小类型
-        if (cpuMemoryRatio > MORE_CPU_RATIO) {
+        if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
-        } else if (cpuMemoryRatio < MORE_MEMORY_RATIO) {
+        } else if (fcmp(cpuMemoryRatio - MORE_MEMORY_RATIO) < 0) {
             _category = Category::MORE_MEMORY;
         } else if (cpu >= SAME_LARGE_THR && memory >= SAME_LARGE_THR) {
             _category = Category::SAME_LARGE;
@@ -302,9 +307,9 @@ public:
         }
         if (nowcpu == 0 && nowmem == 0) return Category::SAME_LARGE;
         if (nowmem == 0) return Category::MORE_CPU;
-        double k = (nowcpu + 0.0) / nowmem;
-        if (k >= MORE_CPU_RATIO) return Category::MORE_CPU;
-        else if (k <= MORE_MEMORY_RATIO) return Category::MORE_MEMORY;
+        volatile double k = (double) nowcpu / nowmem;
+        if (fcmp(k - MORE_CPU_RATIO) >= 0) return Category::MORE_CPU;
+        else if (fcmp(k - MORE_MEMORY_RATIO) <= 0) return Category::MORE_MEMORY;
         return Category::SAME_LARGE;
     }
 
@@ -682,7 +687,12 @@ private:
         idx = line.find(',', lastIdx + 1);
         int id = atoi(line.substr(lastIdx, idx - lastIdx).c_str());
 
-        return new Query(++addQueryIDCount, day, type, id, model);
+        int queryID = 0;
+        if (type == Query::Type::ADD) {
+            queryID = ++addQueryIDCount;
+        }
+
+        return new Query(queryID, day, type, id, model);
     }
 
     static Query::Type parseType(const std::string &str) {
@@ -1163,13 +1173,13 @@ private:
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, &it, this](ServerType *a, ServerType *b) {
                               auto deployType = vm->deployType;
-                              double k = dailyMaxCPUInPerType[deployType][vm->category] /
+                              volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
                                          dailyMaxMemInPerType[deployType][vm->category];
-                              double k1 = a->cpu / a->memory;
-                              double k2 = b->cpu / b->memory;
+                              volatile double k1 = a->cpu / a->memory;
+                              volatile double k2 = b->cpu / b->memory;
 
-                              double absKa = fabs(k1 - k);
-                              double absKb = fabs(k2 - k);
+                              volatile double absKa = fabs(k1 - k);
+                              volatile double absKb = fabs(k2 - k);
                               if (vm->category == Category::SAME_LARGE) {
                                   if (a->category != b->category) {
                                       if (a->category == vm->category) {
@@ -1220,6 +1230,7 @@ private:
                                   }
 
                               }
+                              throw std::logic_error("unexpected vm category");
                           });
             }
             canLocateFlag = false;
@@ -1344,16 +1355,16 @@ private:
             if (lastNode->getCategory(lastDeployNode) == vm->category) {
                 return 1;
             }
-            if (vm->category == 2 && lastNode->getCategory(lastDeployNode) == 4) {
+            if (vm->category == Category::MORE_CPU && lastNode->getCategory(lastDeployNode) == Category::MORE_MEMORY) {
                 return -1;
             }
-            if (vm->category == 2 && nowNode->getCategory(deployNode) == 4) {
+            if (vm->category == Category::MORE_CPU && nowNode->getCategory(deployNode) == Category::MORE_MEMORY) {
                 return 1;
             }
-            if (vm->category == 4 && lastNode->getCategory(lastDeployNode) == 2) {
+            if (vm->category == Category::MORE_MEMORY && lastNode->getCategory(lastDeployNode) == Category::MORE_CPU) {
                 return -1;
             }
-            if (vm->category == 4 && nowNode->getCategory(deployNode) == 2) {
+            if (vm->category == Category::MORE_MEMORY && nowNode->getCategory(deployNode) == Category::MORE_CPU) {
                 return 1;
             }
         }
@@ -1363,17 +1374,17 @@ private:
         }
 
         if (deployNode == Server::DeployNode::DUAL_NODE) {
-            if (nowNode->getLeftCPU(Server::NODE_0) <= lastNode->getLeftCPU(Server::NODE_0) &&
-                nowNode->getLeftMemory(Server::NODE_0) <= lastNode->getLeftMemory(Server::NODE_0)) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) <= 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) <= 0) {
                 return -1;
             }
-            if (nowNode->getLeftCPU(Server::NODE_0) > lastNode->getLeftCPU(Server::NODE_0) &&
-                nowNode->getLeftMemory(Server::NODE_0) > lastNode->getLeftMemory(Server::NODE_0)) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) > 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
                 return 1;
             }
-            double k = (double) vm->cpu / vm->memory;
-            if (nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k <=
-                lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k) {
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
+                     (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
                 return -1;
             }
             return 1;
@@ -1399,8 +1410,8 @@ private:
             if (nowCPU > lastCPU && nowMem > lastMem) {
                 return 1;
             }
-            double k = (double) vm->cpu / vm->memory;
-            if (nowCPU + nowMem * k <= lastCPU + lastMem * k) {
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
                 return -1;
             }
             return 1;
