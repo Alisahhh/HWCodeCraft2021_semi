@@ -59,10 +59,13 @@ public:
             std::vector<std::pair<Server *, Server::DeployNode>> deployList;
 
             // migration
-            if (VM::getVMCount() > 34 * 6) {
+            if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList);
+                //limit -= migrator->combineLowLoadRatePMPre(day, limit, migrationList);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
+                //limit -= migrator->migrateScatteredVM(day, limit, migrationList);
+                //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
             }
 
             //auto queryList = queryListK[day % K];
@@ -318,6 +321,7 @@ private:
             if (!canLocateFlag) {
                 ServerType *m;
                 for (auto &am : machineListForSort) {
+                    //if(am->cpu < 600 || am->memory < 600) continue;
                     if (am->canDeployVM(vm)) {
                         m = am;
                         break;
@@ -480,8 +484,10 @@ private:
         int emptyMachine[2] = {};
         for (int i = 0; i < 2; i++) {
             for (auto &aliveM : aliveMachineList[i]) {
+                //std::clog << aliveM.second->toString() << std::endl;
                 if (aliveM.second->empty()) {
                     emptyMachine[i]++;
+                    continue;
                 }
                 // if(aliveM.second.empty()) continue;
                 resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
@@ -517,10 +523,10 @@ private:
 
                 if (pm.second->empty()) continue;
 
-                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.1*pm.second->cpu) cpuHighFlag = true;
-                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) > 0.7*pm.second->cpu) cpuLowFlag = true;
-                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.1*pm.second->memory) memHighFlag = true;
-                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) > 0.7*pm.second->memory) memLowFlag = true;
+                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.9*pm.second->cpu) cpuHighFlag = true;
+                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) > 0.6*pm.second->cpu) cpuLowFlag = true;
+                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.9*pm.second->memory) memHighFlag = true;
+                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) > 0.6*pm.second->memory) memLowFlag = true;
 
                 if(cpuHighFlag && memHighFlag)
                     dualHighCnt++;

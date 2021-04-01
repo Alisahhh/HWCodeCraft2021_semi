@@ -18,6 +18,7 @@ public:
     }
 
     int migrateScatteredVM(int day, int limit, std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
+        if(limit == 0) return 0;
         std::vector<int> pmIdList[2];
         std::vector<int> pmIdListForVMSelect[2];
 
@@ -65,7 +66,8 @@ public:
             }
 
             auto outPM = Server::getServer(outPMId);
-            if (outPM->getMemoryUsage() < 0.5 && outPM->getCPUUsage() < 0.5) continue;
+            volatile double thr = 0.1;
+            if (fcmp(outPM->getMemoryUsage() - thr) < 0 && fcmp(outPM->getCPUUsage() - thr) < 0) continue;
 
             std::set<int> cacheVMIdList;
             auto vmList = Server::getServer(outPMId)->getAllDeployedVMs();
@@ -128,6 +130,10 @@ public:
         std::vector<int> pmIdAllList[2];
         std::vector<int> pmIdSelectedList[2];
         std::set<int> vmIdSet[2];
+        std::unordered_map<int, std::pair<int,int> > shakeLink[2];
+        std::vector<int> shakeOrder[2];
+
+        bool finFlag = false;
 
         for (int i = 0; i < 2; i++) {
             for (auto &pm : aliveMachineList[i]) {
@@ -169,7 +175,8 @@ public:
             }
 
             auto pm = aliveMachineList[i][outPMId];
-            if(pm->getCPUUsage() > 0.5 || pm->getMemoryUsage() > 0.5) {
+            volatile double thr = 0.3;
+            if (fcmp(pm->getCPUUsage() - thr) > 0 && fcmp(pm->getMemoryUsage() - thr) > 0) {
                 auto outPMDeployedVMNums = pm->getAllDeployedVMs().size();
                 pmIdSelectedList[i].push_back(outPMId);
                 auto vmList = Server::getServer(outPMId)->getAllDeployedVMs();
@@ -179,17 +186,18 @@ public:
             }
         }
 
-        sortPMByScale(pmIdSelectedList[0]);
-        sortPMByScale(pmIdSelectedList[1]);
+        sortPMByScaleRev(pmIdSelectedList[0]);
+        sortPMByScaleRev(pmIdSelectedList[1]);
 
         int nodeType = 1;
         for (auto &curPM:pmIdSelectedList[nodeType]) {
-            if (migCnt >= limit) break;
+            if (migCnt >= limit || finFlag) break;
             bool canDeployFlag = false;
             int minRemainResourceWeightedSum = INT32_MAX;
             int minVMId = -1;
             
             do{
+                if (migCnt >= limit || finFlag) break;
                 canDeployFlag = false;
                 minRemainResourceWeightedSum = INT32_MAX;
                 minVMId = -1;
@@ -205,13 +213,15 @@ public:
                 }
 
                 if (canDeployFlag) {
+                    shakeOrder[0].push_back(minVMId);
+                    shakeLink[0][minVMId] = std::make_pair(Server::getDeployServer(minVMId)->id, curPM);
                     migCnt++;
                     placeVM(Server::getDeployServer(minVMId)->id, curPM, minVMId, Server::DUAL_NODE);
                     vmIdSet[nodeType].erase(minVMId);
-                    migrationList.emplace_back(minVMId, curPM, Server::DUAL_NODE);
+                    //migrationList.emplace_back(minVMId, curPM, Server::DUAL_NODE);
                 }
             }while(canDeployFlag);
-
+            if (migCnt >= limit || finFlag) break;
             
             auto vmList = Server::getServer(curPM)->getAllDeployedVMs();
             for (auto[vm, deployNode] : vmList) {
@@ -223,12 +233,13 @@ public:
 
         nodeType = 0;
         for (auto &curPM:pmIdSelectedList[nodeType]) {
-            if (migCnt >= limit) break;
+            if (migCnt >= limit || finFlag) break;
             bool canDeployFlag = false;
             int minRemainResourceWeightedSum = INT32_MAX;
             int minVMId = -1;
             ServerType::DeployNode minType;
             do{
+                if (migCnt >= limit || finFlag) break;
                 canDeployFlag = false;
                 minRemainResourceWeightedSum = INT32_MAX;
                 minVMId = -1;
@@ -254,12 +265,15 @@ public:
                 }
 
                 if (canDeployFlag) {
-                    migCnt++;
+                    shakeOrder[0].push_back(minVMId);
+                    shakeLink[0][minVMId] = std::make_pair(Server::getDeployServer(minVMId)->id, curPM);
+                    migCnt++
                     placeVM(Server::getDeployServer(minVMId)->id, curPM, minVMId, minType);
                     vmIdSet[nodeType].erase(minVMId);
-                    migrationList.emplace_back(minVMId, curPM, minType);
+                    //migrationList.emplace_back(minVMId, curPM, minType);
                 }
             }while(canDeployFlag);
+            if (migCnt >= limit || finFlag) break;
 
             auto vmList = Server::getServer(curPM)->getAllDeployedVMs();
             for (auto[vm, deployNode] : vmList) {
@@ -269,7 +283,128 @@ public:
             }
         }
 
-        return migCnt;
+        sortPMByScale(pmIdSelectedList[0]);
+        sortPMByScale(pmIdSelectedList[1]);
+
+        for (int i=0;i<2;i++){
+            vmIdSet[i].clear();
+            for(auto &curPM:pmIdSelectedList[i]){
+                auto vmList = Server::getServer(curPM)->getAllDeployedVMs();
+                for (auto[vm, deployNode] : vmList) {
+                    vmIdSet[i].insert(vm->id);
+                }
+            }
+        }
+
+        nodeType = 1;
+        for (auto &curPM:pmIdSelectedList[nodeType]) {
+            if (migCnt >= limit || finFlag) break;
+            bool canDeployFlag = false;
+            int minRemainResourceWeightedSum = INT32_MAX;
+            int minVMId = -1;
+            
+            do{
+                if (migCnt >= limit || finFlag) break;
+                canDeployFlag = false;
+                minRemainResourceWeightedSum = INT32_MAX;
+                minVMId = -1;
+                for (auto &curVM:vmIdSet[nodeType]){
+                    if (Server::getServer(curPM)->canDeployVM(VM::getVM(curVM)) && Server::getDeployServer(curVM)->id!=curPM) {
+                        int curRemainResourceWeightedSum = getRemainResourceWeightedSum(Server::getServer(curPM), VM::getVM(curVM), Server::DUAL_NODE);
+                        if (curRemainResourceWeightedSum < minRemainResourceWeightedSum) {
+                            minRemainResourceWeightedSum = curRemainResourceWeightedSum;
+                            minVMId = curVM;
+                        }
+                        canDeployFlag = true;
+                    }
+                }
+
+                if (canDeployFlag) {
+                    shakeOrder[1].push_back(minVMId);
+                    if (curPM == shakeLink[0][minVMId].first){
+                        shakeLink[0].erase(minVMId);
+                        migCnt--;
+                    }else{
+                        shakeLink[1][minVMId] = std::make_pair(Server::getDeployServer(minVMId)->id, curPM);
+                        migCnt++;
+                    }
+                    placeVM(Server::getDeployServer(minVMId)->id, curPM, minVMId, Server::DUAL_NODE);
+                    vmIdSet[nodeType].erase(minVMId);
+                    //migrationList.emplace_back(minVMId, curPM, Server::DUAL_NODE);
+                }
+            }while(canDeployFlag);
+            if (migCnt >= limit || finFlag) break;
+            
+            auto vmList = Server::getServer(curPM)->getAllDeployedVMs();
+            for (auto[vm, deployNode] : vmList) {
+                if (vmIdSet[nodeType].find(vm->id) != vmIdSet[nodeType].end()){
+                    vmIdSet[nodeType].erase(vm->id);
+                }
+            }
+        }
+
+        nodeType = 0;
+        for (auto &curPM:pmIdSelectedList[nodeType]) {
+            if (migCnt >= limit || finFlag) break;
+            bool canDeployFlag = false;
+            int minRemainResourceWeightedSum = INT32_MAX;
+            int minVMId = -1;
+            ServerType::DeployNode minType;
+            do{
+                if (migCnt >= limit || finFlag) break;
+                canDeployFlag = false;
+                minRemainResourceWeightedSum = INT32_MAX;
+                minVMId = -1;
+                for (auto &curVM:vmIdSet[nodeType]){
+                    if (Server::getServer(curPM)->canDeployVM(VM::getVM(curVM), Server::NODE_0) && Server::getDeployServer(curVM)->id!=curPM) {
+                        int curRemainResourceWeightedSum = getRemainResourceWeightedSum(Server::getServer(curPM), VM::getVM(curVM), Server::NODE_0);
+                        if (curRemainResourceWeightedSum < minRemainResourceWeightedSum) {
+                            minRemainResourceWeightedSum = curRemainResourceWeightedSum;
+                            minVMId = curVM;
+                            minType = Server::NODE_0;
+                        }
+                        canDeployFlag = true;
+                    }
+                    if (Server::getServer(curPM)->canDeployVM(VM::getVM(curVM), Server::NODE_1) && Server::getDeployServer(curVM)->id!=curPM) {
+                        int curRemainResourceWeightedSum = getRemainResourceWeightedSum(Server::getServer(curPM), VM::getVM(curVM), Server::NODE_1);
+                        if (curRemainResourceWeightedSum < minRemainResourceWeightedSum) {
+                            minRemainResourceWeightedSum = curRemainResourceWeightedSum;
+                            minVMId = curVM;
+                            minType = Server::NODE_1;
+                        }
+                        canDeployFlag = true;
+                    }
+                }
+
+                if (canDeployFlag) {
+                    shakeOrder[1].push_back(minVMId);
+                    if (curPM == shakeLink[0][minVMId].first){
+                        shakeLink[0].erase(minVMId);
+                        migCnt--;
+                    }else{
+                        shakeLink[1][minVMId] = std::make_pair(Server::getDeployServer(minVMId)->id, curPM);
+                        migCnt++;
+                    }
+                    placeVM(Server::getDeployServer(minVMId)->id, curPM, minVMId, minType);
+                    vmIdSet[nodeType].erase(minVMId);
+                    //migrationList.emplace_back(minVMId, curPM, minType);
+                }
+            }while(canDeployFlag);
+            if (migCnt >= limit || finFlag) break;
+
+            auto vmList = Server::getServer(curPM)->getAllDeployedVMs();
+            for (auto[vm, deployNode] : vmList) {
+                if (vmIdSet[nodeType].find(vm->id) != vmIdSet[nodeType].end()){
+                    vmIdSet[nodeType].erase(vm->id);
+                }
+            }
+        }
+
+#ifdef TEST
+    std::clog << "limit: " << limit << " migCnt: " << migCnt << std::endl;
+#endif
+
+    return migCnt;
     }
 
 private:
@@ -315,7 +450,19 @@ private:
                   auto pmi = Server::getServer(pmIdi);
                   auto pmj = Server::getServer(pmIdj);
 
-                  return (pmi->cpu+(pmi->memory)) * MEMORY_PARA >pmj->cpu+(pmj->memory) * MEMORY_PARA;
+                  return pmi->cpu+(pmi->memory) * MEMORY_PARA >pmj->cpu+(pmj->memory) * MEMORY_PARA;
+                });
+
+      return pmIdList.size();
+    }
+
+    int sortPMByScaleRev(std::vector<int> &pmIdList) {
+      std::sort(pmIdList.begin(), pmIdList.end(),
+                [this](int &pmIdi, int &pmIdj) {
+                  auto pmi = Server::getServer(pmIdi);
+                  auto pmj = Server::getServer(pmIdj);
+
+                  return pmi->cpu+(pmi->memory) * MEMORY_PARA <pmj->cpu+(pmj->memory) * MEMORY_PARA;
                 });
 
       return pmIdList.size();
@@ -338,13 +485,17 @@ private:
 
     int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
         int diff = std::abs((double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
-        const double arg1 = 5;
+        const double arg1 = 10;
         const int arg2 = 3;
+
 
       return ((pm->getLeftCPU(dn) - vm->cpu) *
                  FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
              (pm->getLeftMemory(dn) - vm->memory) *
                  FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category]) * (1 + pow(diff * arg1, arg2));
+                 
+
+               // return std::abs((pm->getLeftCPU(dn) - vm->cpu) - (pm->getLeftMemory(dn) - vm->memory));
     }
 
     int findPM(std::vector<int> &pmIdList, int outPmID, VM *vm, VMType::DeployType deployType, int &type, int &pos) {
@@ -469,7 +620,7 @@ private:
         pm = aliveMachineList[deployType][inPmID];
         pm->deploy(vm, node);
 
-        #ifdef TEST
+        #ifdef TEST2
         auto outPm = aliveMachineList[deployType][outPmID];
         auto inPm = aliveMachineList[deployType][inPmID];
         fprintf(stderr, "%d %d %d %d %lf %lf %lf %lf\n", deployType, outPmID,
