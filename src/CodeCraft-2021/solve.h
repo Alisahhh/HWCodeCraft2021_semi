@@ -91,7 +91,6 @@ public:
                 if (!flagAddQueriesEmpty &&
                     (query->type == Query::Type::DEL || query->id == (*queryList.rbegin())->id)) {
                     for (auto &addQueryList : addQueryLists) {
-                        std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
                         handleAddQueries(addQueryList, purchaseList);
                     }
 
@@ -196,13 +195,39 @@ private:
 
     std::vector<ServerType *> machineListForSort;
     std::unordered_map<int, Server *> aliveMachineList[2];
+    void prePurchase() {
+        for(int i = 0;i < 2;i ++) {
+            int needCPU = dailyMaxCPU[i] - dailyEmptyCPU[i];
+            int needMem = dailyMaxMem[i] - dailyEmptyMem[i];
+            if(needCPU <= 0 && needMem <= 0) continue;
+    #ifdef TEST
+            std::clog << "needCPU: " << needCPU << std::endl;
+            std::clog << "needMem: " << needMem << std::endl;
+    #endif
+            Server *miniServer = nullptr;
+            int miniCost = 1e9 + 7; 
+            // for(auto server : machineListForSort) {
+            //     if(server->category != Category::SAME_TOO_LARGE) continue;
+            //     int cnt = std::max(needCPU / server->cpu, needMem / server->memory);
+            //     if(cnt * )
+            // }
+        }
+    }
 
-    void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
+    void handleAddQueries(std::vector<std::pair<VMType *, Query *>> &addQueryList,
                           std::vector<Server *> &purchaseList) {
-        bool canLocateFlag = false;
+        std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
 
         calcQueryListResource(addQueryList);
+        calcMachineResource();
+        prePurchase();
 
+
+
+
+
+
+        bool canLocateFlag = false;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
@@ -433,6 +458,28 @@ private:
             isPeak = true;
         } else {
             isPeak = false;
+        }
+    }
+
+    // 机器的剩余CPU
+    // 0表示单节点，1表示双节点
+    int dailyEmptyCPUInPerType[2][5] = {};
+
+    // 机器的剩余MEM
+    // 0表示单节点，1表示双节点
+    int dailyEmptyMemInPerType[2][5] = {};
+
+    int dailyEmptyCPU[2];
+    int dailyEmptyMem[2];
+
+    void calcMachineResource() {
+        memset(dailyEmptyCPU, 0 ,sizeof(dailyEmptyCPU));
+        memset(dailyEmptyMem, 0 ,sizeof(dailyEmptyMem));
+        for(int i = 0;i < 2;i ++) {
+            for(auto [id, server] : aliveMachineList[i]) {
+                dailyEmptyCPU[i] += server->getLeftCPU();
+                dailyEmptyMem[i] += server->getLeftMemory();
+            }
         }
     }
 
