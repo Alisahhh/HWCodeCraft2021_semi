@@ -105,7 +105,7 @@ public:
         for (auto[server, deployNode] : deployList) {
 #ifdef DEBUG_O3
             id++;
-            std::cout << "id " << id << " ";
+            std::cout << "query id " << id << " ";
 #endif
             std::cout << "(" << getOutputServerID(server->id);
             if (deployNode != Server::DeployNode::DUAL_NODE) {

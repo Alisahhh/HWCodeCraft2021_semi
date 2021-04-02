@@ -12,7 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
-const double EPS = 1e-6;
+const double EPS = 1e-12;
 
 inline int fcmp(double a) {
     if (fabs(a) <= EPS) return 0;
@@ -26,9 +26,9 @@ inline int fcmp(double a) {
 //   SAME_LARGE_THR: CPU 与内存均高于此值分类为 SAME_LARGE
 //   其余服务器分类为 SAME_SMALL
 
-const double MORE_CPU_RATIO = 2.2,
-        MORE_MEMORY_RATIO = 1 / 2.2;
-const int SAME_LARGE_THR = 256;
+const double MORE_CPU_RATIO = 2.1,
+        MORE_MEMORY_RATIO = 1 / 2.1;
+const int SAME_LARGE_THR = 300;
 
 enum Category : int {
     SAME_SMALL = 0, // CPU 内存差不多，比较小
@@ -317,11 +317,11 @@ public:
         return nodes[node].leftMemory;
     }
 
-    double getCPUUsage(DeployNode node = DUAL_NODE) const {
+    volatile double getCPUUsage(DeployNode node = DUAL_NODE) const {
         return (double) getLeftCPU(node) / cpu;
     }
 
-    double getMemoryUsage(DeployNode node = DUAL_NODE) const {
+    volatile double getMemoryUsage(DeployNode node = DUAL_NODE) const {
         return (double) getLeftMemory(node) / memory;
     }
 

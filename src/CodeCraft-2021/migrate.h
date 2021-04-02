@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <set>
+#include <iomanip>
 
 #include "data.h"
 #include "util.h"
@@ -56,9 +57,9 @@ public:
                 auto pmTwoNode = aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
-                          (pmOneNode->memory - pmOneNode->getLeftMemory()) * MEMORY_PARA) -
-                         (pmTwoNode->cpu - pmTwoNode->getLeftCPU() +
-                          (pmTwoNode->memory - pmTwoNode->getLeftMemory()) * MEMORY_PARA)) < 0) {
+                     (pmOneNode->memory - pmOneNode->getLeftMemory()) * MEMORY_PARA) -
+                    (pmTwoNode->cpu - pmTwoNode->getLeftCPU() +
+                     (pmTwoNode->memory - pmTwoNode->getLeftMemory()) * MEMORY_PARA)) < 0) {
                     outPMId = pmIdListForVMSelect[0][onePnt++];
                     i = 0;
                 } else {
@@ -68,7 +69,11 @@ public:
             }
 
             auto outPM = Server::getServer(outPMId);
+            //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
             volatile double thr = 0.05;
+#ifdef DEBUG_O3
+            std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
+#endif
             if (fcmp(outPM->getMemoryUsage() - thr) < 0 && fcmp(outPM->getCPUUsage() - thr) < 0) continue;
 
             std::set<int> cacheVMIdList;
@@ -504,7 +509,7 @@ public:
 private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
-    volatile const double MEMORY_PARA = 0.4;
+    volatile const double MEMORY_PARA = 0.45;
     volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
     volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
@@ -519,11 +524,9 @@ private:
                       auto pmj = aliveMachineList[deployType][pmIdj];
 
                       return fcmp((pmi->getLeftCPU(Server::NODE_0) + pmi->getLeftCPU(Server::NODE_1) +
-                                   (pmi->getLeftMemory(Server::NODE_0) + pmi->getLeftMemory(Server::NODE_1)) *
-                                   MEMORY_PARA) -
-                                  (pmj->getLeftCPU(Server::NODE_0) + pmj->getLeftCPU(Server::NODE_1) +
-                                   (pmj->getLeftMemory(Server::NODE_0) + pmj->getLeftMemory(Server::NODE_1)) *
-                                   MEMORY_PARA)) > 0;
+                              (pmi->getLeftMemory(Server::NODE_0) + pmi->getLeftMemory(Server::NODE_1)) * MEMORY_PARA) -
+                             (pmj->getLeftCPU(Server::NODE_0) + pmj->getLeftCPU(Server::NODE_1) +
+                              (pmj->getLeftMemory(Server::NODE_0) + pmj->getLeftMemory(Server::NODE_1)) * MEMORY_PARA)) > 0;
                   });
         treeArray[deployType].setSize(pmIdList.size());
         for (int i = 1; i <= pmIdList.size(); i++) {
@@ -572,10 +575,9 @@ private:
                       auto pmi = aliveMachineList[deployType][pmIdi];
                       auto pmj = aliveMachineList[deployType][pmIdj];
 
-                      return fcmp((pmi->cpu - pmi->getLeftCPU() +
-                                   (pmi->memory - pmi->getLeftMemory()) * MEMORY_PARA) -
-                                  (pmj->cpu - pmj->getLeftCPU() +
-                                   (pmj->memory - pmj->getLeftMemory()) * MEMORY_PARA)) < 0;
+                      return fcmp((pmi->cpu - pmi->getLeftCPU() + (pmi->memory - pmi->getLeftMemory()) * MEMORY_PARA) -
+                                  (pmj->cpu - pmj->getLeftCPU() + (pmj->memory - pmj->getLeftMemory()) * MEMORY_PARA)) <
+                             0;
                   });
 
         return pmIdList.size();
@@ -659,7 +661,7 @@ private:
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
                     if (curPM->getCategory(Server::NODE_0) == vm->category) {
-                        if (*curPMId != outPmID || Server::getDeployType(vm->id) != Server::NODE_0) {
+                        if (*curPMId != outPmID || Server::getDeployInfo(vm->id).second != Server::NODE_0) {
                             FlagA = true;
                         }
                         //step = 1;
@@ -667,7 +669,7 @@ private:
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
                     if (curPM->getCategory(Server::NODE_1) == vm->category) {
-                        if (*curPMId != outPmID || Server::getDeployType(vm->id) != Server::NODE_1) {
+                        if (*curPMId != outPmID || Server::getDeployInfo(vm->id).second != Server::NODE_1) {
                             FlagB = true;
                         }
                         //step = 1;

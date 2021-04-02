@@ -75,6 +75,7 @@ public:
 
             //auto queryList = queryListK[day % K];
             auto queryList = io->readDayQueries();
+            calcDailyResource(queryList);
             /*if (day != 1 && day + K - 1 <= T) {
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
@@ -105,6 +106,9 @@ public:
                         for (auto[vmType, query] : addQueryList) {
                             auto deployInfo = Server::getDeployInfo(query->vmID);
                             tmpDeployList.emplace_back(query->id, deployInfo);
+#ifdef DEBUG_O3
+                            //std::clog << "vm " << query->vmID << " deployed at server " << deployInfo.first->id << std::endl;
+#endif
                         }
                     }
                     std::sort(tmpDeployList.begin(), tmpDeployList.end());
@@ -145,8 +149,8 @@ public:
             io->writePurchaseList(purchaseList);
             io->writeMigrationList(migrationList);
             io->writeDeployList(deployList);
-
 #ifdef TEST
+            fprintf(stderr, "ispeak %d\n", isPeak);
             checkUsedRate();
 #endif
         }
@@ -195,7 +199,7 @@ private:
                         (vmB->memory + vmB->cpu * COMPARE_ADD_QUERY_RATIO)) > 0;
         } else {
             return fcmp((vmA->memory * COMPARE_ADD_QUERY_RATIO + vmA->cpu) -
-                        (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu)) > 0;
+                   (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu)) > 0;
         }
     }
 
@@ -206,13 +210,13 @@ private:
                           std::vector<Server *> &purchaseList) {
         bool canLocateFlag = false;
 
-        calcDailyResource(addQueryList);
+        calcQueryListResource(addQueryList);
 
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            volatile double param = 0.8;
-            if (isPeak) param = 0.3;
+            volatile double param = 1.2;
+            if (isPeak) param = 1.0;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
@@ -270,8 +274,8 @@ private:
                                       return a->category < b->category;
                                   } else {
                                       if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                                       } else {
                                           return fcmp(absKa - absKb) < 0;
                                       }
@@ -336,25 +340,38 @@ private:
 
 
             if (!canLocateFlag) {
-                ServerType *m;
-                for (auto &am : machineListForSort) {
-                    //if(am->cpu < 600 || am->memory < 600) continue;
-                    if (am->canDeployVM(vm)) {
-                        m = am;
-                        break;
+                Server *aliveM = nullptr;
+                bool canSteal = false;
+                for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                    aliveM = top.second;
+                    if(!aliveM->empty()) continue;
+                    if(aliveM->category != vm->category) continue;
+                    if(vm->deployType == VMType::SINGLE) {
+                        if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                    } else {
+                        if(!aliveM->canDeployVM(vm)) continue;
                     }
+                    canSteal = true;
+                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    break;
                 }
-                Server *aliveM = Server::newServer(*m);
-                aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                purchaseList.push_back(aliveM);
-#ifdef TEST
-                hardwareCost += aliveM->hardwareCost;
-                totalCost += aliveM->hardwareCost;
-#endif
-#ifdef DEBUG_O3
-//                std::clog << "type 3 vm " << vm->id << " deployed at server " << aliveM->id << std::endl;
-//                std::clog << aliveM->toString() << std::endl;
-#endif
+                if(!canSteal) {
+                    ServerType *m;
+                    for (auto &am : machineListForSort) {
+                        if (am->canDeployVM(vm)) {
+                            m = am;
+                            break;
+                        }
+                    }
+                    aliveM = Server::newServer(*m);
+                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    purchaseList.push_back(aliveM);
+                    #ifdef TEST
+                        hardwareCost += aliveM->hardwareCost;
+                        totalCost += aliveM->hardwareCost;
+                    #endif
+                }
                 if (vm->deployType == VMType::DUAL) {
                     if (aliveM->canDeployVM(vm)) {
                         aliveM->deploy(vm);
@@ -386,7 +403,7 @@ private:
     int dailyMaxCPU[2];
     int dailyMaxMem[2];
 
-    void calcDailyResource(const std::vector<std::pair<VMType *, Query *>> &addQueryList) {
+    void calcQueryListResource(const std::vector<std::pair<VMType *, Query *>> &addQueryList) {
         memset(dailyMaxCPU, 0, sizeof(dailyMaxCPU));
         memset(dailyMaxMem, 0, sizeof(dailyMaxMem));
         memset(dailyMaxCPUInPerType, 0, sizeof(dailyMaxCPUInPerType));
@@ -413,9 +430,42 @@ private:
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
         }
-        if (day == 134) {
-            // std::clog << dailyMaxCPU[0] + dailyMaxCPU[1] << std::endl;
-            // std::clog << dailyMaxMem[0] + dailyMaxMem[1] << std::endl;
+    }
+
+    void calcDailyResource(const std::vector<Query *> &queryList) {
+        memset(dailyMaxCPU, 0, sizeof(dailyMaxCPU));
+        memset(dailyMaxMem, 0, sizeof(dailyMaxMem));
+        memset(dailyMaxCPUInPerType, 0, sizeof(dailyMaxCPUInPerType));
+        memset(dailyMaxMemInPerType, 0, sizeof(dailyMaxMemInPerType));
+        int nowCPU[2][5], nowMem[2][5];
+        memset(nowCPU, 0, sizeof(nowCPU));
+        memset(nowMem, 0, sizeof(nowMem));
+
+        for (auto &query : queryList) {
+            if (query->type == Query::DEL) {
+                auto vm = VM::getVM(query->vmID);
+                nowCPU[vm->deployType][vm->category] -= vm->cpu;
+                nowMem[vm->deployType][vm->category] -= vm->memory;
+
+            } else {
+                auto vm = commonData->getVMType(query->vmModel);
+                nowCPU[vm->deployType][vm->category] += vm->cpu;
+                nowMem[vm->deployType][vm->category] += vm->memory;
+                int nowTotalCPU = 0, nowTotalMem = 0;
+                for (int j = 1; j <= 4; j++) {
+                    if (j == 3) continue;
+                    nowTotalCPU += nowCPU[vm->deployType][j];
+                    nowTotalMem += nowMem[vm->deployType][j];
+                }
+                dailyMaxCPU[vm->deployType] = std::max(dailyMaxCPU[vm->deployType], nowTotalCPU);
+                dailyMaxMem[vm->deployType] = std::max(dailyMaxMem[vm->deployType], nowTotalMem);
+                dailyMaxCPUInPerType[vm->deployType][vm->category] = std::max(
+                        dailyMaxCPUInPerType[vm->deployType][vm->category],
+                        nowCPU[vm->deployType][vm->category]);
+                dailyMaxMemInPerType[vm->deployType][vm->category] = std::max(
+                        dailyMaxMemInPerType[vm->deployType][vm->category],
+                        nowMem[vm->deployType][vm->category]);
+            }
         }
         if (dailyMaxCPU[0] + dailyMaxCPU[1] >= PEAK_CPU && dailyMaxMem[0] + dailyMaxMem[1] >= PEAK_MEM) {
             // std::clog << "PEAK DAY: " << day << std::endl;
@@ -450,6 +500,15 @@ private:
         if (lastNode->empty() != nowNode->empty()) {
             if (nowNode->empty()) return 1;
             if (lastNode->empty()) return -1;
+        }
+
+        if (lastNode->empty() && nowNode->empty()) {
+            if (lastNode->energyCost < nowNode->energyCost) {
+                return 1;
+            }
+            if (lastNode->energyCost > nowNode->energyCost) {
+                return -1;
+            }
         }
 
         if (deployNode == Server::DeployNode::DUAL_NODE) {
@@ -505,7 +564,6 @@ private:
         int emptyMachine[2] = {};
         for (int i = 0; i < 2; i++) {
             for (auto &aliveM : aliveMachineList[i]) {
-                //std::clog << aliveM.second->toString() << std::endl;
                 if (aliveM.second->empty()) {
                     emptyMachine[i]++;
                     continue;
@@ -548,13 +606,13 @@ private:
                          (0.1 * pm.second->cpu)) < 0)
                     cpuHighFlag = true;
                 if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
-                         (0.6 * pm.second->cpu)) > 0)
+                         (0.7 * pm.second->cpu)) > 0)
                     cpuLowFlag = true;
                 if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
                          (0.1 * pm.second->memory)) < 0)
                     memHighFlag = true;
                 if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
-                         (0.6 * pm.second->memory)) > 0)
+                         (0.7 * pm.second->memory)) > 0)
                     memLowFlag = true;
 
                 if (cpuHighFlag && memHighFlag)
