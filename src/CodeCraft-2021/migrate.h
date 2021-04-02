@@ -135,7 +135,7 @@ public:
         std::vector<int> shakeOrder[2];
         std::set<int> shakeFixVM[2];
         ServerShadowFactory migrateSimulationServer;
-
+        
         bool finFlag = false;
 
         for (int i = 0; i < 2; i++) {
@@ -563,13 +563,11 @@ private:
         int diff = std::abs((double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
         const double arg1 = 10;
         const int arg2 = 3;
-
-
-      return ((pm->getLeftCPU(dn) - vm->cpu) *
+    
+        return ((pm->getLeftCPU(dn) - vm->cpu) *
                  FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
              (pm->getLeftMemory(dn) - vm->memory) *
                  FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category]) * (1 + pow(diff * arg1, arg2));
-                 
 
                // return std::abs((pm->getLeftCPU(dn) - vm->cpu) - (pm->getLeftMemory(dn) - vm->memory));
     }
@@ -593,7 +591,8 @@ private:
         }
         
         auto outPM = aliveMachineList[deployType][outPmID];
-        int curMinimalRemainder = getRemainResourceWeightedSum(outPM, vm, Server::getDeployInfo(vm->id).second);
+        //int curMinimalRemainder = getRemainResourceWeightedSum(outPM, vm, Server::getDeployInfo(vm->id).second);
+        int curMinimalRemainder = INT32_MAX;
         int minusCnt = 0;
         int findCnt = 0;
 

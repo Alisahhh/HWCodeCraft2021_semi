@@ -523,9 +523,9 @@ private:
 
                 if (pm.second->empty()) continue;
 
-                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.9*pm.second->cpu) cpuHighFlag = true;
+                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.1*pm.second->cpu) cpuHighFlag = true;
                 if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) > 0.6*pm.second->cpu) cpuLowFlag = true;
-                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.9*pm.second->memory) memHighFlag = true;
+                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.1*pm.second->memory) memHighFlag = true;
                 if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) > 0.6*pm.second->memory) memLowFlag = true;
 
                 if(cpuHighFlag && memHighFlag)
