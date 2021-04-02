@@ -99,7 +99,14 @@ public:
     }
 
     void writeDeployList(const std::vector<std::pair<Server *, Server::DeployNode>> &deployList) {
+#ifdef DEBUG_O3
+        int id = 0;
+#endif
         for (auto[server, deployNode] : deployList) {
+#ifdef DEBUG_O3
+            id++;
+            std::cout << "id " << id << " ";
+#endif
             std::cout << "(" << getOutputServerID(server->id);
             if (deployNode != Server::DeployNode::DUAL_NODE) {
                 std::cout << ", " << getDeployNodeStr(deployNode);
@@ -116,6 +123,9 @@ private:
     int outputServerIDCount = 0;
 
     int getOutputServerID(int serverID) {
+#ifdef DEBUG_O3
+        return serverID;
+#endif
         return outputServerIDMap[serverID];
     }
 

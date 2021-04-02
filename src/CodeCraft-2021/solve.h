@@ -50,7 +50,12 @@ public:
         for (day = 1; day <= T; day++) {
 #ifdef TEST
             //if (day % 100 == 0) std::clog << "DAY " << day << std::endl;
-            std::clog << "Day " << day << " ServCnt: " << Server::getServerCount() << " VMCnt: " << VM::getVMCount() << std::endl;
+            std::clog << "Day " << day << " ServCnt: " << Server::getServerCount() << " VMCnt: " << VM::getVMCount()
+                      << std::endl;
+#endif
+#ifdef DEBUG_O3
+            std::cout << "day " << day << std::endl;
+//            if (day > 10) exit(0);
 #endif
 
             // IO
@@ -127,9 +132,9 @@ public:
             }
 
 #ifdef TEST
-            for(int i = 0; i < 2;i ++) {
-                for(auto &aliveM : aliveMachineList[i] ) {
-                    if(!aliveM.second->empty()) {
+            for (int i = 0; i < 2; i++) {
+                for (auto &aliveM : aliveMachineList[i]) {
+                    if (!aliveM.second->empty()) {
                         totalCost += aliveM.second->energyCost;
                     }
                 }
@@ -186,11 +191,11 @@ private:
         if (vmA->category == Category::SAME_LARGE) {
             return (vmA->memory + vmA->cpu) > (vmB->memory + vmB->cpu);
         } else if (vmA->category == Category::MORE_CPU) {
-            return (vmA->memory + vmA->cpu * COMPARE_ADD_QUERY_RATIO) >
-                   (vmB->memory + vmB->cpu * COMPARE_ADD_QUERY_RATIO);
+            return fcmp((vmA->memory + vmA->cpu * COMPARE_ADD_QUERY_RATIO) -
+                        (vmB->memory + vmB->cpu * COMPARE_ADD_QUERY_RATIO)) > 0;
         } else {
-            return (vmA->memory * COMPARE_ADD_QUERY_RATIO + vmA->cpu) >
-                   (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu);
+            return fcmp((vmA->memory * COMPARE_ADD_QUERY_RATIO + vmA->cpu) -
+                        (vmB->memory * COMPARE_ADD_QUERY_RATIO + vmB->cpu)) > 0;
         }
     }
 
@@ -230,7 +235,7 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (absKa < 0.5 && absKb < 0.5) {
+                                      if (fcmp(absKa - 0.5) < 0 && fcmp(absKb - 0.5) < 0) {
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
@@ -247,11 +252,11 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (absKa < 2 && absKb < 2) {
+                                      if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
-                                          return absKa < absKb;
+                                          return fcmp(absKa - absKb) < 0;
                                       }
                                   }
                               } else if (vm->category == Category::MORE_MEMORY) {
@@ -290,7 +295,13 @@ private:
 
                 }
 
-                if (canLocateFlag) minAlivm->deploy(vm, Server::DUAL_NODE);
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, Server::DUAL_NODE);
+                }
 
             } else {
                 Server *minAlivm = nullptr;
@@ -314,7 +325,13 @@ private:
                         canLocateFlag = true;
                     }
                 }
-                if (canLocateFlag) minAlivm->deploy(vm, lastType);
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, lastType);
+                }
             }
 
 
@@ -333,6 +350,10 @@ private:
 #ifdef TEST
                 hardwareCost += aliveM->hardwareCost;
                 totalCost += aliveM->hardwareCost;
+#endif
+#ifdef DEBUG_O3
+//                std::clog << "type 3 vm " << vm->id << " deployed at server " << aliveM->id << std::endl;
+//                std::clog << aliveM->toString() << std::endl;
 #endif
                 if (vm->deployType == VMType::DUAL) {
                     if (aliveM->canDeployVM(vm)) {
@@ -500,8 +521,8 @@ private:
             }
         }
         for (int i = 0; i < 2; i++) {
-            double cpuEmptyRate = 0;
-            double memEmptyRate = 0;
+            volatile double cpuEmptyRate = 0;
+            volatile double memEmptyRate = 0;
 
             if (resourceTotalCPU[i])
                 cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
@@ -515,7 +536,7 @@ private:
             int dualLowCnt = 0;
             int dualHighCnt = 0;
 
-            for(auto &pm:aliveMachineList[i]){
+            for (auto &pm:aliveMachineList[i]) {
                 bool cpuHighFlag = false;
                 bool cpuLowFlag = false;
                 bool memHighFlag = false;
@@ -523,28 +544,36 @@ private:
 
                 if (pm.second->empty()) continue;
 
-                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) < 0.1*pm.second->cpu) cpuHighFlag = true;
-                if (pm.second->getLeftCPU(Server::NODE_0)+pm.second->getLeftCPU(Server::NODE_1) > 0.6*pm.second->cpu) cpuLowFlag = true;
-                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) < 0.1*pm.second->memory) memHighFlag = true;
-                if (pm.second->getLeftMemory(Server::NODE_0)+pm.second->getLeftMemory(Server::NODE_1) > 0.6*pm.second->memory) memLowFlag = true;
+                if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
+                         (0.1 * pm.second->cpu)) < 0)
+                    cpuHighFlag = true;
+                if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
+                         (0.6 * pm.second->cpu)) > 0)
+                    cpuLowFlag = true;
+                if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
+                         (0.1 * pm.second->memory)) < 0)
+                    memHighFlag = true;
+                if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
+                         (0.6 * pm.second->memory)) > 0)
+                    memLowFlag = true;
 
-                if(cpuHighFlag && memHighFlag)
+                if (cpuHighFlag && memHighFlag)
                     dualHighCnt++;
-                else if(cpuLowFlag && memLowFlag)
+                else if (cpuLowFlag && memLowFlag)
                     dualLowCnt++;
-                else{
-                    if(cpuLowFlag) cpuLowCnt++;
-                    else if(cpuHighFlag) cpuHighCnt++;
-                    
-                    if(memLowFlag) memLowCnt++;
-                    else if(memHighFlag) memHighCnt++;
+                else {
+                    if (cpuLowFlag) cpuLowCnt++;
+                    else if (cpuHighFlag) cpuHighCnt++;
+
+                    if (memLowFlag) memLowCnt++;
+                    else if (memHighFlag) memHighCnt++;
                 }
             }
 
             std::clog << cpuEmptyRate << ", " << memEmptyRate << ", "
-                << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
-                << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
-                << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+                      << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
+                      << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
+                      << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
         }
 
         std::clog << std::endl;
