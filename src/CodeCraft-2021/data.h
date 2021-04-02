@@ -544,7 +544,7 @@ class ServerShadowFactory {
 private:
     friend class ServerShadow;
 
-    std::unordered_set<ServerShadow *> shadowList;
+    std::unordered_map<int, ServerShadow *> shadowMap;
     std::unordered_map<int, std::pair<int, Server::DeployNode>> vmDeployMap;
 
 public:
@@ -552,27 +552,28 @@ public:
         vmDeployMap = Server::vmDeployMap;
     }
 
-    ServerShadow *newServerShadow(Server *src) {
-        auto shadow = new ServerShadow(src, &vmDeployMap);
-        shadowList.insert(shadow);
-        return shadow;
+    ServerShadow *getServerShadow(Server *src) {
+        if (shadowMap.find(src->id) == shadowMap.end()) {
+            shadowMap[src->id] = new ServerShadow(src, &vmDeployMap);
+        }
+        return shadowMap[src->id];
     }
 
-    void removeServerShadow(ServerShadow *&shadow) {
-        shadowList.erase(shadow);
-        delete shadow;
+    ServerShadow *getServerShadow(int srcID) {
+        auto src = Server::getServer(srcID);
+        return getServerShadow(src);
     }
 
     void resetAll() {
         vmDeployMap = Server::vmDeployMap;
-        for (auto shadow : shadowList) {
+        for (auto[id, shadow] : shadowList) {
             shadow->reset();
         }
     }
 
     virtual ~ServerShadowFactory() {
-        for (auto shadow : shadowList) {
-            removeServerShadow(shadow);
+        for (auto[id, shadow] : shadowList) {
+            delete shadow;
         }
     }
 };
