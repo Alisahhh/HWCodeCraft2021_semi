@@ -174,7 +174,7 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
-    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
+    static constexpr long double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
 
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
@@ -209,20 +209,20 @@ private:
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            volatile double param = 1;
+            volatile long double param = 1;
             if (isPeak) param = 1;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, param, &it, this](ServerType *a, ServerType *b) {
                               auto deployType = vm->deployType;
-                              volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
+                              volatile long double k = dailyMaxCPUInPerType[deployType][vm->category] /
                                                   dailyMaxMemInPerType[deployType][vm->category];
-                              volatile double k1 = a->cpu / a->memory;
-                              volatile double k2 = b->cpu / b->memory;
+                              volatile long double k1 = a->cpu / a->memory;
+                              volatile long double k2 = b->cpu / b->memory;
 
-                              volatile double absKa = fabs(k1 - k);
-                              volatile double absKb = fabs(k2 - k);
+                              volatile long double absKa = fabs(k1 - k);
+                              volatile long double absKb = fabs(k2 - k);
                               if (vm->category == Category::SAME_LARGE) {
                                   if (a->category != b->category) {
                                       if (a->category == vm->category) {
@@ -322,20 +322,38 @@ private:
 
 
             if (!canLocateFlag) {
-                ServerType *m;
-                for (auto &am : machineListForSort) {
-                    if (am->canDeployVM(vm)) {
-                        m = am;
-                        break;
+                Server *aliveM = nullptr;
+                bool canSteal = false;
+                for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                    aliveM = top.second;
+                    if(!aliveM->empty()) continue;
+                    if(aliveM->category != vm->category) continue;
+                    if(vm->deployType == VMType::SINGLE) {
+                        if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                    } else {
+                        if(!aliveM->canDeployVM(vm)) continue;
                     }
+                    canSteal = true;
+                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    break;
                 }
-                Server *aliveM = Server::newServer(*m);
-                aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                purchaseList.push_back(aliveM);
-#ifdef TEST
-                hardwareCost += aliveM->hardwareCost;
-                totalCost += aliveM->hardwareCost;
-#endif
+                if(!canSteal) {
+                    ServerType *m;
+                    for (auto &am : machineListForSort) {
+                        if (am->canDeployVM(vm)) {
+                            m = am;
+                            break;
+                        }
+                    }
+                    aliveM = Server::newServer(*m);
+                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    purchaseList.push_back(aliveM);
+                    #ifdef TEST
+                        hardwareCost += aliveM->hardwareCost;
+                        totalCost += aliveM->hardwareCost;
+                    #endif
+                }
                 if (vm->deployType == VMType::DUAL) {
                     if (aliveM->canDeployVM(vm)) {
                         aliveM->deploy(vm);
@@ -484,7 +502,7 @@ private:
                 fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
                 return 1;
             }
-            volatile double k = (double) vm->cpu / vm->memory;
+            volatile long double k = (long double) vm->cpu / vm->memory;
             if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
                      (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
                 return -1;
@@ -512,7 +530,7 @@ private:
             if (nowCPU > lastCPU && nowMem > lastMem) {
                 return 1;
             }
-            volatile double k = (double) vm->cpu / vm->memory;
+            volatile long double k = (long double) vm->cpu / vm->memory;
             if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
                 return -1;
             }
@@ -543,8 +561,8 @@ private:
             }
         }
         for (int i = 0; i < 2; i++) {
-            double cpuEmptyRate = 0;
-            double memEmptyRate = 0;
+            long double cpuEmptyRate = 0;
+            long double memEmptyRate = 0;
 
             if (resourceTotalCPU[i])
                 cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];

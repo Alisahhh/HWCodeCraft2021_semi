@@ -74,7 +74,7 @@ public:
 
             auto outPM = Server::getServer(outPMId);
             //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
-            volatile double thr = 0.05;
+            volatile long double thr = 0.05;
 #ifdef DEBUG_O3
             std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
 #endif
@@ -140,9 +140,9 @@ public:
 private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
-    volatile const double MEMORY_PARA = 0.4;
-    volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
-    volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
+    volatile const long double MEMORY_PARA = 0.4;
+    volatile const long double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
+    volatile const long double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
@@ -189,8 +189,8 @@ private:
     }
 
     volatile int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
-        volatile double diff = std::abs((double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
-        const double arg1 = 15;
+        volatile long double diff = std::abs((long double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (long double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
+        const long double arg1 = 15;
         const int arg2 = 3;
     
         return ((pm->getLeftCPU(dn) - vm->cpu) *

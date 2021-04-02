@@ -10,8 +10,8 @@ const int N = 1000010;
 typedef long long ll;
 typedef unsigned int uint;
 typedef unsigned long long ull;
-const double pi=acos(-1);
-const double eps=1e-6;
+const long double pi=acos(-1);
+const long double eps=1e-6;
 inline int lowbit(int x){return x&(-x);}
 inline int read(){
 	int f=1,x=0;char ch;
