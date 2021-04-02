@@ -140,9 +140,9 @@ public:
 private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
-    volatile const long double MEMORY_PARA = 0.4;
-    volatile const long double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
-    volatile const long double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
+    volatile const double MEMORY_PARA = 0.45;
+    volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
+    volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
