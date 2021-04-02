@@ -145,6 +145,7 @@ public:
             io->writeMigrationList(migrationList);
             io->writeDeployList(deployList);
 #ifdef TEST
+            fprintf(stderr, "ispeak %d\n", isPeak);
             checkUsedRate();
 #endif
         }
@@ -209,8 +210,8 @@ private:
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            volatile double param = 1;
-            if (isPeak) param = 1;
+            volatile double param = 1.2;
+            if (isPeak) param = 1.0;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
