@@ -439,16 +439,16 @@ public:
 
     void deploy(VM *vm, DeployNode node) override {
         if (vmDeployMap->find(vm->id) != vmDeployMap->end()) {
-            throw std::logic_error("Server::deploy: this vm has been deployed");
+            throw std::logic_error("ServerShadow::deploy: this vm has been deployed");
         }
         if (vm->deployType == VMType::DeployType::SINGLE) {
             if (!canDeployVM(vm, node)) {
-                throw std::logic_error("Server::deploy: cannot deploy vm on given server");
+                throw std::logic_error("ServerShadow::deploy: cannot deploy vm on given server");
             }
             deploySingle(vm, node);
         } else {
             if (!canDeployVM(vm, Server::DUAL_NODE)) {
-                throw std::logic_error("Server::deploy: cannot deploy vm on given server");
+                throw std::logic_error("ServerShadow::deploy: cannot deploy vm on given server");
             }
             deployDual(vm);
         }
@@ -457,7 +457,7 @@ public:
     void remove(VM *vm) override {
         auto it = vmDeployMap->find(vm->id);
         if (it == vmDeployMap->end() || it->second.first != id) {
-            throw std::logic_error("Server::remove: vm not found in this server");
+            throw std::logic_error("ServerShadow::remove: vm not found in this server");
         }
         if (vm->deployType == VMType::DeployType::SINGLE) {
             removeSingle(vm, it->second.second);
