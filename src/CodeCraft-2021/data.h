@@ -566,13 +566,37 @@ public:
 
     void resetAll() {
         vmDeployMap = Server::vmDeployMap;
-        for (auto[id, shadow] : shadowList) {
+        for (auto[id, shadow] : shadowMap) {
             shadow->reset();
         }
     }
 
+    Server *getDeployServer(int vmID) {
+        auto it = vmDeployMap.find(vmID);
+        if (it == vmDeployMap.end()) {
+            throw std::logic_error("Server::getDeployServer: given vm have not been deployed");
+        }
+        return getServerShadow(it->second.first);
+    }
+
+    ServerType::DeployNode getDeployType(int vmID) {
+        auto it = vmDeployMap.find(vmID);
+        if (it == vmDeployMap.end()) {
+            throw std::logic_error("Server::getDeployType: given vm have not been deployed");
+        }
+        return it->second.second;
+    }
+
+    std::pair<Server *, Server::DeployNode> getDeployInfo(int vmID) {
+        auto it = vmDeployMap.find(vmID);
+        if (it == vmDeployMap.end()) {
+            throw std::logic_error("Server::getDeployInfo: given vm have not been deployed");
+        }
+        return {getServerShadow(it->second.first), it->second.second};
+    }
+
     virtual ~ServerShadowFactory() {
-        for (auto[id, shadow] : shadowList) {
+        for (auto[id, shadow] : shadowMap) {
             delete shadow;
         }
     }
