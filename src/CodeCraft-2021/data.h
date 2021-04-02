@@ -569,6 +569,12 @@ public:
             shadow->reset();
         }
     }
+
+    virtual ~ServerShadowFactory() {
+        for (auto shadow : shadowList) {
+            removeServerShadow(shadow);
+        }
+    }
 };
 
 // 公共信息（服务器与虚拟机参数）
