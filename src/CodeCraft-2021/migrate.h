@@ -66,7 +66,7 @@ public:
             }
 
             auto outPM = Server::getServer(outPMId);
-            volatile double thr = 0.1;
+            volatile double thr = 0.05;
             if (fcmp(outPM->getMemoryUsage() - thr) < 0 && fcmp(outPM->getCPUUsage() - thr) < 0) continue;
 
             std::set<int> cacheVMIdList;
@@ -135,7 +135,7 @@ public:
         std::vector<int> shakeOrder[2];
         std::set<int> shakeFixVM[2];
         ServerShadowFactory migrateSimulationServer;
-        
+
         bool finFlag = false;
 
         for (int i = 0; i < 2; i++) {
@@ -628,7 +628,6 @@ private:
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
-                if (*curPMId == outPmID) continue;
 
                 auto curPM = aliveMachineList[deployType][*curPMId];
                 // avoid startup an empty machine
@@ -639,13 +638,17 @@ private:
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
                     if ( curPM->getCategory(Server::NODE_0) == vm->category){
-                        FlagA = true;
+                        if (*curPMId != outPmID || Server::getDeployType(vm->id) != Server::NODE_0) {
+                            FlagA = true;
+                        }
                         //step = 1;
                     }
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
                     if ( curPM->getCategory(Server::NODE_1) == vm->category){
-                        FlagB = true;
+                        if (*curPMId != outPmID || Server::getDeployType(vm->id) != Server::NODE_1) {
+                            FlagB = true;
+                        }
                         //step = 1;
                     }
                 }
