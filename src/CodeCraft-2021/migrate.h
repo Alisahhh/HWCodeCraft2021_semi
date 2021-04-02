@@ -189,10 +189,14 @@ private:
     }
 
     volatile int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
-        return (pm->getLeftCPU(dn) - vm->cpu) *
-               FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
-               (pm->getLeftMemory(dn) - vm->memory) *
-               FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category];
+        volatile double diff = std::abs((double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
+        const double arg1 = 15;
+        const int arg2 = 3;
+    
+        return ((pm->getLeftCPU(dn) - vm->cpu) *
+                 FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
+             (pm->getLeftMemory(dn) - vm->memory) *
+                 FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category]) * (1 + pow(diff * arg1, arg2));
     }
 
     int findPM(std::vector<int> &pmIdList, int outPmID, VM *vm, VMType::DeployType deployType, int &type, int &pos) {
