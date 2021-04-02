@@ -9,6 +9,7 @@
     </sourceRoots>
     <excludeRoots>
       <file path="$PROJECT_DIR$/src/CodeCraft-2021/bin" />
+      <file path="$PROJECT_DIR$/src/CodeCraft-2021/tmp" />
       <file path="$PROJECT_DIR$/src/bin" />
       <file path="$PROJECT_DIR$/src/build" />
     </excludeRoots>

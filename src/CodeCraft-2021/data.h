@@ -388,10 +388,19 @@ public:
         return server;
     }
 
+    static void removeServer(int id) {
+        auto it = serverMap.find(id);
+        if (it == serverMap.end()) {
+            throw std::logic_error("Server::removeServer: given server id does not match any of the servers");
+        }
+        delete it->second; // 回收内存
+        serverMap.erase(it);
+    }
+
     static Server *getServer(int id) {
         auto it = serverMap.find(id);
         if (it == serverMap.end()) {
-            throw std::logic_error("VM::getVM: given vm id does not match any of the vms");
+            throw std::logic_error("Server::getServer: given server id does not match any of the servers");
         }
         return it->second;
     }
@@ -399,7 +408,7 @@ public:
     static Server *getDeployServer(int vmID) {
         auto it = vmDeployMap.find(vmID);
         if (it == vmDeployMap.end()) {
-            throw std::logic_error("VM::getVM: given vm have not been deployed");
+            throw std::logic_error("Server::getDeployServer: given vm have not been deployed");
         }
         return getServer(it->second.first);
     }
@@ -407,7 +416,7 @@ public:
     static std::pair<Server *, DeployNode> getDeployInfo(int vmID) {
         auto it = vmDeployMap.find(vmID);
         if (it == vmDeployMap.end()) {
-            throw std::logic_error("VM::getVM: given vm have not been deployed");
+            throw std::logic_error("Server::getDeployInfo: given vm have not been deployed");
         }
         return {getServer(it->second.first), it->second.second};
     }
