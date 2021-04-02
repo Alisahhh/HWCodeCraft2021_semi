@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 const double EPS = 1e-6;
@@ -218,7 +219,7 @@ public:
         return nodes[node].canDeploy(vmType->cpu, vmType->memory);
     }
 
-    void deploy(VM *vm, DeployNode node = DeployNode::DUAL_NODE) {
+    virtual void deploy(VM *vm, DeployNode node = DeployNode::DUAL_NODE) {
         if (vmDeployMap.find(vm->id) != vmDeployMap.end()) {
             throw std::logic_error("Server::deploy: this vm has been deployed");
         }
@@ -235,7 +236,7 @@ public:
         }
     }
 
-    void remove(VM *vm) {
+    virtual void remove(VM *vm) {
         auto it = vmDeployMap.find(vm->id);
         if (it == vmDeployMap.end() || it->second.first != id) {
             throw std::logic_error("Server::remove: vm not found in this server");
@@ -325,6 +326,17 @@ public:
     }
 
 private:
+    inline static int serverIDCounter;
+    inline static std::unordered_map<int, Server *> serverMap;
+
+    inline static std::unordered_map<int, std::pair<int, DeployNode>> vmDeployMap;
+    std::unordered_map<int, DeployNode> deployedVMs;
+
+protected:
+    friend class ServerShadowFactory;
+
+    friend class ServerShadow;
+
     Server(int _id, const ServerType &_type) : id(_id), ServerType(_type) {
         nodes[0] = nodes[1] = {cpu / 2, memory / 2};
     }
@@ -339,24 +351,18 @@ private:
 
     Node nodes[2];
 
-    inline static int serverIDCounter;
-    inline static std::unordered_map<int, Server *> serverMap;
-
-    inline static std::unordered_map<int, std::pair<int, DeployNode>> vmDeployMap;
-    std::unordered_map<int, DeployNode> deployedVMs;
-
     int getNodeCPU() const { return cpu / 2; }
 
     int getNodeMemory() const { return memory / 2; };
 
-    void deploySingle(VM *vm, DeployNode node) {
+    virtual void deploySingle(VM *vm, DeployNode node) {
         nodes[node].leftCPU -= vm->cpu;
         nodes[node].leftMemory -= vm->memory;
         vmDeployMap[vm->id] = {id, node};
         deployedVMs[vm->id] = node;
     }
 
-    void deployDual(VM *vm) {
+    virtual void deployDual(VM *vm) {
         nodes[0].leftCPU -= vm->cpu / 2;
         nodes[0].leftMemory -= vm->memory / 2;
         nodes[1].leftCPU -= vm->cpu / 2;
@@ -365,14 +371,14 @@ private:
         deployedVMs[vm->id] = DeployNode::DUAL_NODE;
     }
 
-    void removeSingle(VM *vm, DeployNode node) {
+    virtual void removeSingle(VM *vm, DeployNode node) {
         nodes[node].leftCPU += vm->cpu;
         nodes[node].leftMemory += vm->memory;
         vmDeployMap.erase(vm->id);
         deployedVMs.erase(vm->id);
     }
 
-    void removeDual(VM *vm) {
+    virtual void removeDual(VM *vm) {
         nodes[0].leftCPU += vm->cpu / 2;
         nodes[0].leftMemory += vm->memory / 2;
         nodes[1].leftCPU += vm->cpu / 2;
@@ -422,6 +428,146 @@ public:
 
     static int getServerCount() {
         return serverMap.size();
+    }
+};
+
+// Server 的影子对象
+class ServerShadow : public Server {
+public:
+    ServerShadow(Server *_src, std::unordered_map<int, std::pair<int, Server::DeployNode>> *_vmDeployMap) :
+            src(_src), vmDeployMap(_vmDeployMap), Server(*_src) {}
+
+    void deploy(VM *vm, DeployNode node) override {
+        if (vmDeployMap->find(vm->id) != vmDeployMap->end()) {
+            throw std::logic_error("Server::deploy: this vm has been deployed");
+        }
+        if (vm->deployType == VMType::DeployType::SINGLE) {
+            if (!canDeployVM(vm, node)) {
+                throw std::logic_error("Server::deploy: cannot deploy vm on given server");
+            }
+            deploySingle(vm, node);
+        } else {
+            if (!canDeployVM(vm, Server::DUAL_NODE)) {
+                throw std::logic_error("Server::deploy: cannot deploy vm on given server");
+            }
+            deployDual(vm);
+        }
+    }
+
+    void remove(VM *vm) override {
+        auto it = vmDeployMap->find(vm->id);
+        if (it == vmDeployMap->end() || it->second.first != id) {
+            throw std::logic_error("Server::remove: vm not found in this server");
+        }
+        if (vm->deployType == VMType::DeployType::SINGLE) {
+            removeSingle(vm, it->second.second);
+        } else {
+            removeDual(vm);
+        }
+    }
+
+    std::string toString() const override {
+        std::ostringstream ss;
+        ss << "SERVER SHADOW DATA " << id << std::endl;
+        ss << "  MODEL: " << model << std::endl;
+        ss << "  CPU: " << cpu << std::endl;
+        ss << "  MEMORY: " << memory << std::endl;
+        ss << "  HARDWARE COST: " << hardwareCost << std::endl;
+        ss << "  ENERGY COST: " << energyCost << std::endl;
+        ss << "  CATEGORY: " << category << std::endl;
+        ss << "  NODE INFO:" << std::endl;
+        int idx = 0;
+        for (const auto &node : nodes) {
+            ss << "    NODE " << idx << ": CPU " << nodes[idx].leftCPU << ", MEMORY " << nodes[idx].leftMemory
+               << std::endl;
+            idx++;
+        }
+        ss << "  DEPLOY INFO:" << std::endl;
+        auto vms = getAllDeployedVMs();
+        for (auto[vm, deployNode] : vms) {
+            ss << "    VM " << vm->id << ": NODE ";
+            if (deployNode == DeployNode::DUAL_NODE) ss << "DUAL";
+            else ss << deployNode;
+            ss << std::endl;
+        }
+        ss << std::endl;
+        return ss.str();
+    }
+
+private:
+    friend class ServerShadowFactory;
+
+    const Server *src;
+    std::unordered_map<int, std::pair<int, Server::DeployNode>> *const vmDeployMap;
+
+    void reset() {
+        nodes[0] = src->nodes[0];
+        nodes[1] = src->nodes[1];
+        deployedVMs = src->deployedVMs;
+    }
+
+    void deploySingle(VM *vm, DeployNode node) override {
+        nodes[node].leftCPU -= vm->cpu;
+        nodes[node].leftMemory -= vm->memory;
+        (*vmDeployMap)[vm->id] = {id, node};
+        deployedVMs[vm->id] = node;
+    }
+
+    void deployDual(VM *vm) override {
+        nodes[0].leftCPU -= vm->cpu / 2;
+        nodes[0].leftMemory -= vm->memory / 2;
+        nodes[1].leftCPU -= vm->cpu / 2;
+        nodes[1].leftMemory -= vm->memory / 2;
+        (*vmDeployMap)[vm->id] = {id, DeployNode::DUAL_NODE};
+        deployedVMs[vm->id] = DeployNode::DUAL_NODE;
+    }
+
+    void removeSingle(VM *vm, DeployNode node) override {
+        nodes[node].leftCPU += vm->cpu;
+        nodes[node].leftMemory += vm->memory;
+        vmDeployMap->erase(vm->id);
+        deployedVMs.erase(vm->id);
+    }
+
+    void removeDual(VM *vm) override {
+        nodes[0].leftCPU += vm->cpu / 2;
+        nodes[0].leftMemory += vm->memory / 2;
+        nodes[1].leftCPU += vm->cpu / 2;
+        nodes[1].leftMemory += vm->memory / 2;
+        vmDeployMap->erase(vm->id);
+        deployedVMs.erase(vm->id);
+    }
+};
+
+// ServerShadow 工厂类
+class ServerShadowFactory {
+private:
+    friend class ServerShadow;
+
+    std::unordered_set<ServerShadow *> shadowList;
+    std::unordered_map<int, std::pair<int, Server::DeployNode>> vmDeployMap;
+
+public:
+    ServerShadowFactory() {
+        vmDeployMap = Server::vmDeployMap;
+    }
+
+    ServerShadow *newServerShadow(Server *src) {
+        auto shadow = new ServerShadow(src, &vmDeployMap);
+        shadowList.insert(shadow);
+        return shadow;
+    }
+
+    void removeServerShadow(ServerShadow *&shadow) {
+        shadowList.erase(shadow);
+        delete shadow;
+    }
+
+    void resetAll() {
+        vmDeployMap = Server::vmDeployMap;
+        for (auto shadow : shadowList) {
+            shadow->reset();
+        }
     }
 };
 
