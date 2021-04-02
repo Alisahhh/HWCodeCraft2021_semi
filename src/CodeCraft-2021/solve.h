@@ -71,6 +71,8 @@ public:
             //auto queryList = queryListK[day % K];
             auto queryList = io->readDayQueries();
             calcDailyResource(queryList);
+            calcMachineResource();
+            prePurchase();
             /*if (day != 1 && day + K - 1 <= T) {
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
@@ -206,11 +208,12 @@ private:
     #endif
             Server *miniServer = nullptr;
             int miniCost = 1e9 + 7; 
-            // for(auto server : machineListForSort) {
-            //     if(server->category != Category::SAME_TOO_LARGE) continue;
-            //     int cnt = std::max(needCPU / server->cpu, needMem / server->memory);
-            //     if(cnt * )
-            // }
+            for(auto server : machineListForSort) {
+                if(server->cpu < SAME_TOO_LARGE_THR || server->memory < SAME_TOO_LARGE_THR) continue;
+                // if(server->category != Category::SAME_TOO_LARGE) continue;
+                // int cnt = std::max(needCPU / server->cpu, needMem / server->memory);
+                // if(cnt * )
+            }
         }
     }
 
@@ -219,13 +222,6 @@ private:
         std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
 
         calcQueryListResource(addQueryList);
-        calcMachineResource();
-        prePurchase();
-
-
-
-
-
 
         bool canLocateFlag = false;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
