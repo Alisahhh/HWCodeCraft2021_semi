@@ -74,7 +74,7 @@ public:
 
             auto outPM = Server::getServer(outPMId);
             //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
-            volatile double thr = 0.1;
+            volatile double thr = 0.05;
 #ifdef DEBUG_O3
             std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
 #endif
@@ -250,7 +250,6 @@ private:
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId = static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same machine
-                if (*curPMId == outPmID) continue;
 
                 auto curPM = aliveMachineList[deployType][*curPMId];
                 // avoid startup an empty machine
@@ -261,13 +260,17 @@ private:
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
                     if (curPM->getCategory(Server::NODE_0) == vm->category) {
-                        FlagA = true;
+                        if (*curPMId != outPmID || Server::getDeployInfo(vm->id).second != Server::NODE_0) {
+                            FlagA = true;
+                        }
                         //step = 1;
                     }
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
                     if (curPM->getCategory(Server::NODE_1) == vm->category) {
-                        FlagB = true;
+                        if (*curPMId != outPmID || Server::getDeployInfo(vm->id).second != Server::NODE_1) {
+                            FlagB = true;
+                        }
                         //step = 1;
                     }
                 }
