@@ -11,9 +11,9 @@
 #include <unordered_map>
 #include <vector>
 
-const long double EPS = 1e-12;
+const double EPS = 1e-12;
 
-inline int fcmp(long double a) {
+inline int fcmp(double a) {
     if (fabs(a) <= EPS) return 0;
     else return a < 0 ? -1 : 1;
 }
@@ -25,7 +25,7 @@ inline int fcmp(long double a) {
 //   SAME_LARGE_THR: CPU 与内存均高于此值分类为 SAME_LARGE
 //   其余服务器分类为 SAME_SMALL
 
-const long double MORE_CPU_RATIO = 2.1,
+const double MORE_CPU_RATIO = 2.1,
         MORE_MEMORY_RATIO = 1 / 2.1;
 const int SAME_LARGE_THR = 300;
 
@@ -69,7 +69,7 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        volatile long double cpuMemoryRatio = (long double) cpu / memory;
+        volatile double cpuMemoryRatio = (double) cpu / memory;
         _category = Category::SAME_LARGE; // 默认设置为 1
         if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
@@ -174,7 +174,7 @@ public:
 private:
     Category getCategory() const {
         Category _category;
-        volatile long double cpuMemoryRatio = (long double) cpu / memory;
+        volatile double cpuMemoryRatio = (double) cpu / memory;
         _category = Category::SAME_SMALL; // 默认设置为小类型
         if (fcmp(cpuMemoryRatio - MORE_CPU_RATIO) > 0) {
             _category = Category::MORE_CPU;
@@ -292,7 +292,7 @@ public:
         }
         if (nowcpu == 0 && nowmem == 0) return Category::SAME_LARGE;
         if (nowmem == 0) return Category::MORE_CPU;
-        volatile long double k = (long double) nowcpu / nowmem;
+        volatile double k = (double) nowcpu / nowmem;
         if (fcmp(k - MORE_CPU_RATIO) >= 0) return Category::MORE_CPU;
         else if (fcmp(k - MORE_MEMORY_RATIO) <= 0) return Category::MORE_MEMORY;
         return Category::SAME_LARGE;
@@ -316,12 +316,12 @@ public:
         return nodes[node].leftMemory;
     }
 
-    volatile long double getCPUUsage(DeployNode node = DUAL_NODE) const {
-        return (long double) getLeftCPU(node) / cpu;
+    volatile double getCPUUsage(DeployNode node = DUAL_NODE) const {
+        return (double) getLeftCPU(node) / cpu;
     }
 
-    volatile long double getMemoryUsage(DeployNode node = DUAL_NODE) const {
-        return (long double) getLeftMemory(node) / memory;
+    volatile double getMemoryUsage(DeployNode node = DUAL_NODE) const {
+        return (double) getLeftMemory(node) / memory;
     }
 
 private:

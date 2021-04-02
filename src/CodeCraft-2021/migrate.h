@@ -74,7 +74,7 @@ public:
 
             auto outPM = Server::getServer(outPMId);
             //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
-            volatile long double thr = 0.05;
+            volatile double thr = 0.05;
 #ifdef DEBUG_O3
             std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
 #endif
@@ -189,9 +189,9 @@ private:
     }
 
     volatile int getRemainResourceWeightedSum(Server *pm, VM *vm, Server::DeployNode dn = Server::DUAL_NODE) {
-        volatile long double diff = std::abs((long double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (long double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
-        const long double arg1 = 15;
-        const int arg2 = 3;
+        volatile double diff = std::abs((double)(pm->getLeftCPU(dn) - vm->cpu)/(pm->cpu) - (double)(pm->getLeftMemory(dn) - vm->memory)/(pm->memory));
+        const double arg1 = 15;
+        const int arg2 = 2;
     
         return ((pm->getLeftCPU(dn) - vm->cpu) *
                  FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +

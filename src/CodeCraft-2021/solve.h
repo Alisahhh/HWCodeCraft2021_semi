@@ -175,7 +175,7 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
-    static constexpr long double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
+    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
 
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
@@ -217,13 +217,13 @@ private:
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, param, &it, this](ServerType *a, ServerType *b) {
                               auto deployType = vm->deployType;
-                              volatile long double k = dailyMaxCPUInPerType[deployType][vm->category] /
+                              volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
                                                   dailyMaxMemInPerType[deployType][vm->category];
-                              volatile long double k1 = a->cpu / a->memory;
-                              volatile long double k2 = b->cpu / b->memory;
+                              volatile double k1 = a->cpu / a->memory;
+                              volatile double k2 = b->cpu / b->memory;
 
-                              volatile long double absKa = fabs(k1 - k);
-                              volatile long double absKb = fabs(k2 - k);
+                              volatile double absKa = fabs(k1 - k);
+                              volatile double absKb = fabs(k2 - k);
                               if (vm->category == Category::SAME_LARGE) {
                                   if (a->category != b->category) {
                                       if (a->category == vm->category) {
@@ -503,7 +503,7 @@ private:
                 fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
                 return 1;
             }
-            volatile long double k = (long double) vm->cpu / vm->memory;
+            volatile double k = (double) vm->cpu / vm->memory;
             if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
                      (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
                 return -1;
@@ -531,7 +531,7 @@ private:
             if (nowCPU > lastCPU && nowMem > lastMem) {
                 return 1;
             }
-            volatile long double k = (long double) vm->cpu / vm->memory;
+            volatile double k = (double) vm->cpu / vm->memory;
             if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
                 return -1;
             }
@@ -562,8 +562,8 @@ private:
             }
         }
         for (int i = 0; i < 2; i++) {
-            long double cpuEmptyRate = 0;
-            long double memEmptyRate = 0;
+            double cpuEmptyRate = 0;
+            double memEmptyRate = 0;
 
             if (resourceTotalCPU[i])
                 cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];

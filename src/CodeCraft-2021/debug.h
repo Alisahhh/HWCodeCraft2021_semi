@@ -3,5 +3,5 @@
 //
 #pragma once
 
-#define LOG_TIME(time) std::clog << (long double) (time) / CLOCKS_PER_SEC * 1000 << "ms" << std::endl;
-#define LOG_TIME_SEC(time) std::clog << (long double) (time) / CLOCKS_PER_SEC << "s" << std::endl;
+#define LOG_TIME(time) std::clog << (double) (time) / CLOCKS_PER_SEC * 1000 << "ms" << std::endl;
+#define LOG_TIME_SEC(time) std::clog << (double) (time) / CLOCKS_PER_SEC << "s" << std::endl;
