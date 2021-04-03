@@ -28,11 +28,13 @@ inline int fcmp(double a) {
 const double MORE_CPU_RATIO = 2.1,
         MORE_MEMORY_RATIO = 1 / 2.1;
 const int SAME_LARGE_THR = 300;
+const int SAME_TOO_LARGE_THR = 800;
 
 enum Category : int {
     SAME_SMALL = 0, // CPU 内存差不多，比较小
     SAME_LARGE = 1, // CPU 内存差不多，比较大
     MORE_CPU = 2,   // 高 CPU
+    SAME_TOO_LARGE = 3, // CPU 内存差不多，非常大
     MORE_MEMORY = 4 // 高内存
 };
 
@@ -193,6 +195,9 @@ private:
             _category = Category::MORE_MEMORY;
         } else if (cpu >= SAME_LARGE_THR && memory >= SAME_LARGE_THR) {
             _category = Category::SAME_LARGE;
+            // if(cpu >= SAME_TOO_LARGE_THR && memory >= SAME_TOO_LARGE_THR) {
+            //     _category = Category::SAME_TOO_LARGE;
+            // }
         }
         return _category;
     }
