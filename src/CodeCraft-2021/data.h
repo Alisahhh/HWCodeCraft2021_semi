@@ -48,9 +48,10 @@ public:
     const int cpu, memory;
     const DeployType deployType;
     const Category category;
+    volatile const double K;
 
     VMType(std::string _model, int _cpu, int _memory, DeployType _deployType) :
-            model(std::move(_model)), cpu(_cpu), memory(_memory), deployType(_deployType), category(getCategory()) {}
+            model(std::move(_model)), cpu(_cpu), memory(_memory), deployType(_deployType), category(getCategory()), K(getK()){}
 
     virtual std::string toString() const {
         std::ostringstream ss;
@@ -77,6 +78,10 @@ private:
             _category = Category::MORE_MEMORY;
         }
         return _category;
+    }
+    
+    volatile double getK() const {
+        return (double) cpu / memory;
     }
 };
 
@@ -105,6 +110,12 @@ public:
         VM *vm = new VM(id, type);
         vmMap[vm->id] = vm;
         return vm;
+    }
+
+    static VM *newTmpVM(int all_cpu, int mem, VMType::DeployType locate) {
+        VMType type(std::string(""),all_cpu, mem, locate);
+        
+        return new VM(0, type);;
     }
 
     static VM *getVM(int id) {
@@ -462,6 +473,7 @@ public:
     const Type type;
     const std::string vmModel;
     const int vmID;
+    bool done = false;
 
     Query(int _id, int _day, Type _type, int _vmID, std::string _vmModel = "") :
             id(_id), day(_day), type(_type), vmModel(std::move(_vmModel)), vmID(_vmID) {}

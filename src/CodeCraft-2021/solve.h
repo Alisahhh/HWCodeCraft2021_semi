@@ -91,7 +91,6 @@ public:
                 if (!flagAddQueriesEmpty &&
                     (query->type == Query::Type::DEL || query->id == (*queryList.rbegin())->id)) {
                     for (auto &addQueryList : addQueryLists) {
-                        std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
                         handleAddQueries(addQueryList, purchaseList);
                     }
 
@@ -158,6 +157,8 @@ public:
 
         std::clog << "Total Cost: " << totalCost << std::endl;
         std::clog << "HardWare Cost: " << hardwareCost << std::endl;
+        std::clog << "Test Cnt: " << testCnt << std::endl;
+        
 #endif
     }
 
@@ -167,6 +168,7 @@ private:
     bool isPeak = false;
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
+    int testCnt; // 
     std::vector<std::vector<Query *>> queryListK;
 
     StdIO *io;
@@ -198,21 +200,164 @@ private:
         }
     }
 
+    static bool compareAddQueryByK(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
+        auto vmA = a.first, vmB = b.first;
+        if(vmA->deployType != vmB->deployType) {
+           return vmA->deployType < vmB->deployType;
+        }
+        return fcmp(vmA->K - vmB->K) > 0;
+    }
+
     std::vector<ServerType *> machineListForSort;
     std::unordered_map<int, Server *> aliveMachineList[2];
 
-    void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
+    void handleAddQueries(std::vector<std::pair<VMType *, Query *>> &addQueryList,
                           std::vector<Server *> &purchaseList) {
+        
         bool canLocateFlag = false;
+        // step 1 只放到自己应该在的类型
+        std::sort(addQueryList.begin(), addQueryList.end(), compareAddQueryByK);
+        auto lptr = addQueryList.begin();
+        auto rptr = addQueryList.end() - 1;
+        while(lptr < rptr && fcmp(lptr->first->K - 5) > 0) lptr++;
+        while(lptr < rptr && fcmp(rptr->first->K - 0.2) < 0) rptr--;
+        while(lptr < rptr) {
+            auto vmTypeA = lptr->first, vmTypeB = rptr->first;
+            auto queryA = lptr->second, queryB = rptr->second;
+            auto vmA = VM::newVM(queryA->vmID, *vmTypeA);
+            auto vmB = VM::newVM(queryB->vmID, *vmTypeB);
+            if(fcmp(fabs(vmA->K * vmB->K - 1.0) - 0.05) < 0) {
+                canLocateFlag = false;
+                VM *vm = VM::newTmpVM(vmA->cpu + vmB->cpu, vmA->memory + vmB->memory, vmA->deployType);
+                if (vm->deployType == VMType::DeployType::DUAL) {
+                    Server *minAlivm = nullptr;
+                    for (auto top : aliveMachineList[vmA->deployType]) {
+                        auto aliveM = top.second;
+                        if (aliveM->canDeployVM(vm)) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
+                                minAlivm = aliveM;
+                            }
+                            canLocateFlag = true;
+                        }
+
+                    }
+
+                    if (canLocateFlag) {
+                        minAlivm->deploy(vmA, Server::DUAL_NODE);
+                        minAlivm->deploy(vmB, Server::DUAL_NODE);
+                        queryA->done = true;
+                        queryB->done = true;
+                    }
+
+                } else {
+                    Server *minAlivm = nullptr;
+                    Server::DeployNode lastType = Server::DUAL_NODE;
+                    for (auto &top : aliveMachineList[vm->deployType]) {
+                        auto aliveM = top.second;
+                        int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                        int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                        if (flagA) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_0, lastType) < 0) {
+                                minAlivm = aliveM;
+                                lastType = Server::NODE_0;
+                            }
+                            canLocateFlag = true;
+                        }
+                        if (flagB) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_1, lastType) < 0) {
+                                minAlivm = aliveM;
+                                lastType = Server::NODE_1;
+                            }
+                            canLocateFlag = true;
+                        }
+                    }
+                    if (canLocateFlag) {
+                        minAlivm->deploy(vmA, lastType);
+                        minAlivm->deploy(vmB, lastType);
+                        queryA->done = true;
+                        queryB->done = true;
+                        // minAlivm->deploy(vm, lastType);
+                    }
+                }
+
+
+                // if (!canLocateFlag) {
+                //     Server *aliveM = nullptr;
+                //     bool canSteal = false;
+                //     for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                //         aliveM = top.second;
+                //         if(!aliveM->empty()) continue;
+                //         if(aliveM->category != vm->category) continue;
+                //         if(vm->deployType == VMType::SINGLE) {
+                //             if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                //         } else {
+                //             if(!aliveM->canDeployVM(vm)) continue;
+                //         }
+                //         canSteal = true;
+                //         aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                //         aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //         break;
+                //     }
+                //     if(!canSteal) {
+                //         ServerType *m;
+                //         for (auto &am : machineListForSort) {
+                //             if (am->canDeployVM(vm)) {
+                //                 m = am;
+                //                 break;
+                //             }
+                //         }
+                //         aliveM = Server::newServer(*m);
+                //         aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //         purchaseList.push_back(aliveM);
+                //         #ifdef TEST
+                //             hardwareCost += aliveM->hardwareCost;
+                //             totalCost += aliveM->hardwareCost;
+                //         #endif
+                //     }
+                //     if (vm->deployType == VMType::DUAL) {
+                //         if (aliveM->canDeployVM(vm)) {
+                //             aliveM->deploy(vm);
+                //             canLocateFlag = true;
+                //         }
+                //     } else {
+                //         int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                //         int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                //         if (flagA) {
+                //             aliveM->deploy(vm, Server::NODE_0);
+                //             canLocateFlag = true;
+                //         } else if (flagB) {
+                //             aliveM->deploy(vm, Server::NODE_1);
+                //             canLocateFlag = true;
+                //         }
+                //     }
+                // }
+                lptr++;
+                rptr--;
+            } else {
+                if(fcmp(vmA->K * vmB->K - 1) < 0) {
+                    rptr--;
+                } else {
+                    lptr++;
+                }
+            }
+        }
+
+
+        std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
 
         calcQueryListResource(addQueryList);
 
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
+            if(query->done) {
+                testCnt++;
+                continue;
+            }
             volatile double param = 1.2;
             if (isPeak) param = 1.0;
             auto vm = VM::newVM(query->vmID, *vmType);
+
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, param, &it, this](ServerType *a, ServerType *b) {
@@ -396,6 +541,7 @@ private:
         memset(nowMem, 0, sizeof(nowMem));
 
         for (auto[vm, query] : addQueryList) {
+            if(query->done) continue;
             nowCPU[vm->deployType][vm->category] += vm->cpu;
             nowMem[vm->deployType][vm->category] += vm->memory;
             int nowTotalCPU = 0, nowTotalMem = 0;
