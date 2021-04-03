@@ -35,7 +35,7 @@ public:
             testData.push_back({{(double) serverTypeList[i]->hardwareCost / serverTypeList[i]->energyCost}, i});
         }
         auto kMeansEndTime = clock();
-        auto result = kMeans->kMeans(testData, 3);
+        auto result = kMeans->kMeans(testData);
         std::clog << "kMeans complete" << std::endl;
         LOG_TIME(kMeansEndTime - kMeansStartTime)
         exit(0);

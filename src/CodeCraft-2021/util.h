@@ -98,7 +98,8 @@ private:
     Random rand;
 
     static const int MAX_ITER_COUNT = 100;
-    constexpr volatile static const double EPS = 1e-2;
+    volatile static const constexpr double EPS = 1e-2;
+    volatile static const constexpr double EPS_ADAPT_KMEANS = 1e2;
 
     static int fcmp(double a) {
         if (fabs(a) < EPS) return 0;
@@ -163,10 +164,41 @@ private:
         return getCentroid(tmp);
     }
 
+    // 计算一个聚类的方差
+    volatile static double getVariance(const VectorList &list) {
+        if (list.empty()) throw std::logic_error("KMeans::getVariance: empty list");
+        Vector avg = getCentroid(list);
+        std::vector<double> distArr;
+        distArr.reserve(list.size());
+        volatile double distAvg = 0;
+        for (auto &obj : list) {
+            double dist = distance(obj, avg);
+            distAvg += dist;
+            distArr.push_back(dist);
+        }
+        distAvg /= list.size();
+        double var = 0;
+        for (auto dist : distArr) {
+            var += (dist - distAvg) * (dist - distAvg);
+        }
+        var /= list.size();
+        return var;
+    }
+
+    volatile static double getVariance(const ObjectList &list) {
+        VectorList tmp;
+        tmp.reserve(list.size());
+        for (auto &obj : list) {
+            tmp.push_back(obj.first);
+        }
+        return getVariance(tmp);
+    }
+
 public:
-    std::vector<ObjectList> kMeans(ObjectList src, int k) {
+    // k-平均聚类算法
+    std::vector<ObjectList> kMeans(const ObjectList &src, int k) {
         if (src.empty()) throw std::logic_error("KMeans::kMeans: empty list");
-        int n = src.size(), dim = src[0].first.size();
+        int n = src.size();
         std::vector<int> c;
         c.resize(n);
 
@@ -208,5 +240,33 @@ public:
             }
         }
         return res;
+    }
+
+    // 自适应 k-平均聚类算法
+    std::vector<ObjectList> kMeans(const ObjectList &src) {
+        int l = 1, r = src.size();
+        double rVarAvg = testK(src, r);
+        while (r - l > 1) {
+            int mid = (l + r) / 2;
+            double midVarAvg = testK(src, mid);
+            if (fcmp(fabs(midVarAvg - rVarAvg) - EPS_ADAPT_KMEANS) < 0) {
+                r = mid;
+                rVarAvg = midVarAvg;
+            } else {
+                l = mid;
+            }
+        }
+        return kMeans(src, r);
+    }
+
+private:
+    double testK(const ObjectList &src, int k) {
+        auto result = kMeans(src, k);
+        double varAvg = 0;
+        for (auto &cluster : result) {
+            varAvg += getVariance(cluster);
+        }
+        varAvg /= k;
+        return varAvg;
     }
 };
