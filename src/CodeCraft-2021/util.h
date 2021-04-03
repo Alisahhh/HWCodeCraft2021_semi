@@ -87,19 +87,20 @@ public:
     }
 };
 
+template<typename T>
 class KMeans {
 public:
     typedef std::vector<double> Vector;
     typedef std::vector<Vector> VectorList;
-    typedef std::pair<Vector, int> Object;
+    typedef std::pair<Vector, T> Object;
     typedef std::vector<Object> ObjectList;
 
 private:
     Random rand;
 
-    static const int MAX_ITER_COUNT = 100;
+    static const int MAX_ITER_COUNT = 1e4;
     volatile static const constexpr double EPS = 1e-2;
-    volatile static const constexpr double EPS_ADAPT_KMEANS = 1e2;
+    volatile static const constexpr double EPS_ADAPT_KMEANS = 1e1;
 
     static int fcmp(double a) {
         if (fabs(a) < EPS) return 0;
@@ -239,6 +240,9 @@ public:
                 if (c[j] == i) res[i].push_back(src[j]);
             }
         }
+        std::sort(res.begin(), res.end(), [](const ObjectList &a, const ObjectList &b) {
+            return cmpVectorForSort(a[0].first, b[0].first);
+        });
         return res;
     }
 
