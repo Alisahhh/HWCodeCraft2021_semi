@@ -72,7 +72,7 @@ public:
             auto queryList = io->readDayQueries();
             calcDailyResource(queryList);
             calcMachineResource();
-            prePurchase();
+            // prePurchase(purchaseList);
             /*if (day != 1 && day + K - 1 <= T) {
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
@@ -212,7 +212,7 @@ private:
 
     std::vector<ServerType *> machineListForSort;
     std::unordered_map<int, Server *> aliveMachineList[2];
-    void prePurchase() {
+    void prePurchase(std::vector<Server *> &purchaseList) {
         for(int i = 0;i < 2;i ++) {
             int needCPU = dailyMaxCPU[i] - dailyEmptyCPU[i];
             int needMem = dailyMaxMem[i] - dailyEmptyMem[i];
@@ -221,13 +221,29 @@ private:
             std::clog << "needCPU: " << needCPU << std::endl;
             std::clog << "needMem: " << needMem << std::endl;
     #endif
-            Server *miniServer = nullptr;
+            ServerType *miniServer = nullptr;
             int miniCost = 1e9 + 7; 
             for(auto server : machineListForSort) {
                 if(server->cpu < SAME_TOO_LARGE_THR || server->memory < SAME_TOO_LARGE_THR) continue;
+
                 // if(server->category != Category::SAME_TOO_LARGE) continue;
-                // int cnt = std::max(needCPU / server->cpu, needMem / server->memory);
+                int cnt = std::max(needCPU / server->cpu, needMem / server->memory);
+                if(cnt * (server->hardwareCost + server->energyCost * (T - day + 1)) < miniCost) {
+                    miniCost = cnt * (server->hardwareCost + server->energyCost * (T - day + 1));
+                    miniServer = server;
+                }
                 // if(cnt * )
+            }
+            int cnt = std::max(needCPU / miniServer->cpu, needMem / miniServer->memory);
+            for(int j = 1;j <= cnt * 0.1 ;j ++) {
+                testCnt++;
+                auto aliveM = Server::newServer(*miniServer);
+                aliveMachineList[i][aliveM->id] = aliveM;
+                purchaseList.push_back(aliveM);
+                #ifdef TEST
+                        hardwareCost += aliveM->hardwareCost;
+                        totalCost += aliveM->hardwareCost;
+                #endif
             }
         }
     }
@@ -247,9 +263,12 @@ private:
             auto queryA = lptr->second, queryB = rptr->second;
             auto vmA = VM::newVM(queryA->vmID, *vmTypeA);
             auto vmB = VM::newVM(queryB->vmID, *vmTypeB);
-            if(fcmp(fabs(vmA->K * vmB->K - 1.0) - 0.05) < 0) {
+            
+            if(vmA->category == SAME_LARGE || vmB->category == SAME_LARGE) break;
+            VM *vm = VM::newTmpVM(vmA->cpu + vmB->cpu, vmA->memory + vmB->memory, vmA->deployType);
+            if(vm->category == SAME_LARGE) {
                 canLocateFlag = false;
-                VM *vm = VM::newTmpVM(vmA->cpu + vmB->cpu, vmA->memory + vmB->memory, vmA->deployType);
+                
                 if (vm->deployType == VMType::DeployType::DUAL) {
                     Server *minAlivm = nullptr;
                     for (auto top : aliveMachineList[vmA->deployType]) {
@@ -368,7 +387,7 @@ private:
 
         calcQueryListResource(addQueryList);
 
-        bool canLocateFlag = false;
+        canLocateFlag = false;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;

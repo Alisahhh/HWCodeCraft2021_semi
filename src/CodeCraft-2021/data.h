@@ -28,7 +28,7 @@ inline int fcmp(double a) {
 const double MORE_CPU_RATIO = 2.1,
         MORE_MEMORY_RATIO = 1 / 2.1;
 const int SAME_LARGE_THR = 300;
-const int SAME_TOO_LARGE_THR = 800;
+const int SAME_TOO_LARGE_THR = 600;
 
 enum Category : int {
     SAME_SMALL = 0, // CPU 内存差不多，比较小
