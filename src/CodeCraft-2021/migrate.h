@@ -18,7 +18,7 @@ public:
         aliveMachineList = _aliveMachineList;
     }
 
-    int migrateScatteredVM(int day, int limit, std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
+    int migrateScatteredVM(int day, int limit, std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList, volatile double thr = 0.1) {
         if (limit == 0) return 0;
         std::vector<int> pmIdList[2];
         std::vector<int> pmIdListForVMSelect[2];
@@ -70,7 +70,6 @@ public:
 
             auto outPM = Server::getServer(outPMId);
             //fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
-            volatile double thr = 0.05;
 #ifdef DEBUG_O3
             std::clog << "outPM: " << outPM->id << std::fixed << std::setprecision(10) << " mem use: " << outPM->getMemoryUsage() << " cpu use: " << outPM->getCPUUsage() << std::endl;
 #endif

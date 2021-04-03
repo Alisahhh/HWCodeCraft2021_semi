@@ -66,10 +66,10 @@ public:
             // migration
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 //limit -= migrator->combineLowLoadRatePMPre(day, limit, migrationList);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
-                //limit -= migrator->migrateScatteredVM(day, limit, migrationList);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
             }
 
