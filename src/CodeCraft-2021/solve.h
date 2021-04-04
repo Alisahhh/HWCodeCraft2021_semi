@@ -66,12 +66,15 @@ public:
             // migration
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                limit -= migrator->clearHighExpensesPMs(day, limit>>2, migrationList);
+                //limit -= migrator->clearHighExpensesPMs(day, limit>>2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
             }
+
+
+            checkUsedRate();
 
             //auto queryList = queryListK[day % K];
             auto queryList = io->readDayQueries();
@@ -124,6 +127,10 @@ public:
                 // 处理删除请求
                 if (query->type == Query::Type::DEL) {
                     auto vm = VM::getVM(query->vmID);
+                    //fprintf(stderr, "del %d %d %d %d %d\n",vm->id, vmAddRecord[vm->id].second, day, day -vmAddRecord[vm->id].second, vmAddRecord[vm->id].first);
+                    if(vmAddRecord[vm->id].first == true && day -vmAddRecord[vm->id].second < 100){
+                        vmAliveTimeCnt[(day -vmAddRecord[vm->id].second) / 10] ++;
+                    }
                     auto server = Server::getDeployServer(query->vmID);
                     server->remove(vm);
                     VM::removeVM(vm->id);
@@ -173,6 +180,8 @@ private:
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
+    std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
+    int vmAliveTimeCnt[10] = {0};
 
     StdIO *io;
     CommonData *commonData;
@@ -218,6 +227,8 @@ private:
             volatile double param = 1.2;
             if (isPeak) param = 1.0;
             auto vm = VM::newVM(query->vmID, *vmType);
+            vmAddRecord[vm->id] = std::make_pair(isPeak, day);
+
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
                 std::sort(machineListForSort.begin(), machineListForSort.end(),
                           [vm, param, &it, this](ServerType *a, ServerType *b) {
@@ -633,6 +644,8 @@ private:
                       << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
                       << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
         }
+
+        fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);
 
         std::clog << std::endl;
     }
