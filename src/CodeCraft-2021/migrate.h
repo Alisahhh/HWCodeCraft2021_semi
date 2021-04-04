@@ -728,8 +728,6 @@ class Migrator {
                         // vmPool.size());
                     }
 
-                    break;
-
                     if (nodeType == 1) {
                         canDeployFlag = false;
                         minRemainResourceWeightedSum = INT32_MAX;
@@ -1109,23 +1107,11 @@ class Migrator {
                  Server::DeployNode node = Server::DUAL_NODE) {
         // delete in old one
         auto vm = VM::getVM(vmID);
-        auto deployType = vm->deployType;
 
-        auto pm = aliveMachineList[deployType][outPmID];
-        pm->remove(vm);
+        Server::getServer(outPmID)->remove(vm);
 
         // add in new one
-        pm = aliveMachineList[deployType][inPmID];
-        pm->deploy(vm, node);
-
-#ifdef TEST2
-        auto outPm = aliveMachineList[deployType][outPmID];
-        auto inPm = aliveMachineList[deployType][inPmID];
-        fprintf(stderr, "fac: %d %d %d %d %lf %lf %lf %lf\n", node, outPmID,
-                inPmID, vmID, 1 - outPm->getCPUUsage(),
-                1 - outPm->getMemoryUsage(), 1 - inPm->getCPUUsage(),
-                1 - inPm->getMemoryUsage());
-#endif
+        Server::getServer(inPmID)->deploy(vm, node);
     }
 
     void placeVMShadow(ServerShadowFactory &serSim, int outPmID, int inPmID,
