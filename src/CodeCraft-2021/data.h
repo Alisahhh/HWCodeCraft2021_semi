@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <cassert>
 
 const double EPS = 1e-12;
 
@@ -136,6 +137,9 @@ public:
     const std::string model;
     const int cpu, memory, hardwareCost, energyCost;
     const Category category;
+
+    ServerType() : model(std::string("")) , cpu(0) , memory(0) , hardwareCost(0) ,
+                   energyCost(0),category(Category::SAME_SMALL) {}
 
     ServerType(std::string _model, int _cpu, int _memory,
                int _hardwareCost, int _energyCost) :
@@ -337,6 +341,8 @@ protected:
 
     friend class ServerShadow;
 
+    Server(int _id) : id(_id), ServerType() {}
+    
     Server(int _id, const ServerType &_type) : id(_id), ServerType(_type) {
         nodes[0] = nodes[1] = {cpu / 2, memory / 2};
     }
@@ -436,6 +442,11 @@ class ServerShadow : public Server {
 public:
     ServerShadow(Server *_src, std::unordered_map<int, std::pair<int, Server::DeployNode>> *_vmDeployMap) :
             src(_src), vmDeployMap(_vmDeployMap), Server(*_src) {}
+    ServerShadow(Server *_src) :
+            src(_src), vmDeployMap(new std::unordered_map<int, std::pair<int, Server::DeployNode>>()), Server(_src->id) {
+                nodes[0] = src->nodes[0];
+                nodes[1] = src->nodes[1];
+            }
 
     void deploy(VM *vm, DeployNode node) override {
         if (vmDeployMap->find(vm->id) != vmDeployMap->end()) {
@@ -555,6 +566,13 @@ public:
     ServerShadow *getServerShadow(Server *src) {
         if (shadowMap.find(src->id) == shadowMap.end()) {
             shadowMap[src->id] = new ServerShadow(src, &vmDeployMap);
+        }
+        return shadowMap[src->id];
+    }
+
+    ServerShadow *getSimpleServerShadow(Server *src) {
+        if (shadowMap.find(src->id) == shadowMap.end()) {
+            shadowMap[src->id] = new ServerShadow(src);
         }
         return shadowMap[src->id];
     }

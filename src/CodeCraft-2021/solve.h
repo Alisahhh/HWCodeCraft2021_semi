@@ -212,6 +212,207 @@ private:
 
         calcQueryListResource(addQueryList);
 
+        ServerShadowFactory locateSimulationServer;
+        // for(int i = 0;i < 2;i ++) {
+        //     for (auto &top : aliveMachineList[i]) {
+        //         locateSimulationServer.getServerShadow(top.second);
+        //     }
+        // }
+
+        for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
+            auto vmType = it->first;
+            auto query = it->second;
+            volatile double param = 1.2;
+            if (isPeak) param = 1.0;
+            auto vm = VM::newVM(query->vmID, *vmType);
+            if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
+                std::sort(machineListForSort.begin(), machineListForSort.end(),
+                          [vm, param, &it, this](ServerType *a, ServerType *b) {
+                              auto deployType = vm->deployType;
+                              volatile double k = dailyMaxCPUInPerType[deployType][vm->category] /
+                                                  dailyMaxMemInPerType[deployType][vm->category];
+                              volatile double k1 = a->cpu / a->memory;
+                              volatile double k2 = b->cpu / b->memory;
+
+                              volatile double absKa = fabs(k1 - k);
+                              volatile double absKb = fabs(k2 - k);
+                              if (vm->category == Category::SAME_LARGE) {
+                                  if (a->category != b->category) {
+                                      if (a->category == vm->category) {
+                                          return true;
+                                      }
+                                      if (b->category == vm->category) {
+                                          return false;
+                                      }
+                                      return a->category < b->category;
+                                  } else {
+                                      if (fcmp(absKa - 0.5) < 0 && fcmp(absKb - 0.5) < 0) {
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                      } else {
+                                          return fcmp(absKa - absKb) < 0;
+                                      }
+                                  }
+                              } else if (vm->category == Category::MORE_CPU) {
+                                  if (a->category != b->category) {
+                                      if (a->category == vm->category) {
+                                          return true;
+                                      }
+                                      if (b->category == vm->category) {
+                                          return false;
+                                      }
+                                      return a->category < b->category;
+                                  } else {
+                                      if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                                      } else {
+                                          return fcmp(absKa - absKb) < 0;
+                                      }
+                                  }
+                              } else if (vm->category == Category::MORE_MEMORY) {
+                                  if (a->category != b->category) {
+                                      if (a->category == vm->category) {
+                                          return true;
+                                      }
+                                      if (b->category == vm->category) {
+                                          return false;
+                                      }
+                                      return a->category < b->category;
+                                  } else {
+                                      if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
+                                      } else {
+                                          return fcmp(absKa - absKb) < 0;
+                                      }
+                                  }
+
+                              }
+                              throw std::logic_error("unexpected vm category");
+                          });
+            }
+            canLocateFlag = false;
+            if (vm->deployType == VMType::DeployType::DUAL) {
+                ServerShadow *minAlivm = nullptr;
+                for (auto top : aliveMachineList[vm->deployType]) {
+                    auto aliveM = locateSimulationServer.getSimpleServerShadow(top.second);
+                    // std::clog << *aliveM << std::endl;
+                    if (aliveM->canDeployVM(vm)) {
+                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
+                            minAlivm = aliveM;
+                        }
+                        canLocateFlag = true;
+                    }
+
+                }
+
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, Server::DUAL_NODE);
+                    // std::clog << *vm << std::endl;
+                    // std::clog << *minAlivm << std::endl;
+                }
+
+            } else {
+                ServerShadow *minAlivm = nullptr;
+                Server::DeployNode lastType = Server::DUAL_NODE;
+                for (auto &top : aliveMachineList[vm->deployType]) {
+                    auto aliveM = locateSimulationServer.getSimpleServerShadow(top.second);
+                    // std::clog << *aliveM << std::endl;
+                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                    if (flagA) {
+                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_0, lastType) < 0) {
+                            minAlivm = aliveM;
+                            lastType = Server::NODE_0;
+                        }
+                        canLocateFlag = true;
+                    }
+                    if (flagB) {
+                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_1, lastType) < 0) {
+                            minAlivm = aliveM;
+                            lastType = Server::NODE_1;
+                        }
+                        canLocateFlag = true;
+                    }
+                }
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, lastType);
+                    // std::clog << *vm << std::endl;
+                    // std::clog << *minAlivm << std::endl;
+                }
+            }
+
+
+            if (!canLocateFlag) {
+                Server *newAliveM = nullptr;
+                ServerShadow *aliveM = nullptr;
+                bool canSteal = false;
+                // for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                //     aliveM = top.second;
+                //     if(!aliveM->empty()) continue;
+                //     if(aliveM->category != vm->category) continue;
+                //     if(vm->deployType == VMType::SINGLE) {
+                //         if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                //     } else {
+                //         if(!aliveM->canDeployVM(vm)) continue;
+                //     }
+                //     canSteal = true;
+                //     aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                //     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //     break;
+                // }
+                if(!canSteal) {
+                    ServerType *m;
+                    for (auto &am : machineListForSort) {
+                        if (am->canDeployVM(vm)) {
+                            m = am;
+                            break;
+                        }
+                    }
+                    newAliveM = Server::newServer(*m);
+                    aliveMachineList[vm->deployType][newAliveM->id] = newAliveM;
+                    purchaseList.push_back(newAliveM);
+                    // loacte
+                    aliveM = locateSimulationServer.getSimpleServerShadow(newAliveM);
+                    //  locateSimulationServer.getServerShadow(aliveM);
+
+                    #ifdef TEST
+                        hardwareCost += aliveM->hardwareCost;
+                        totalCost += aliveM->hardwareCost;
+                    #endif
+                }
+                if (vm->deployType == VMType::DUAL) {
+                    if (aliveM->canDeployVM(vm)) {
+                        aliveM->deploy(vm, Server::DUAL_NODE);
+                        canLocateFlag = true;
+                    }
+                } else {
+                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                    if (flagA) {
+                        aliveM->deploy(vm, Server::NODE_0);
+                        canLocateFlag = true;
+                    } else if (flagB) {
+                        aliveM->deploy(vm, Server::NODE_1);
+                        canLocateFlag = true;
+                    }
+                }
+                // std::clog << *vm << std::endl;
+                // std::clog << *aliveM << std::endl;
+            }
+        }
+
+
+        // std:: clog << "-------------------begin locate -----------------" << std::endl;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
@@ -305,6 +506,8 @@ private:
 //                    std::clog << minAlivm->toString() << std::endl;
 #endif
                     minAlivm->deploy(vm, Server::DUAL_NODE);
+                    std::cout << *vm << std::endl;
+                    std::cout << *minAlivm << std::endl;
                 }
 
             } else {
@@ -335,27 +538,30 @@ private:
 //                    std::clog << minAlivm->toString() << std::endl;
 #endif
                     minAlivm->deploy(vm, lastType);
+                    // std::clog << *vm << std::endl;
+                    // std::clog << *minAlivm << std::endl;
                 }
             }
 
 
             if (!canLocateFlag) {
+                // assert(0);
                 Server *aliveM = nullptr;
                 bool canSteal = false;
-                for(auto top : aliveMachineList[vm->deployType ^ 1]){
-                    aliveM = top.second;
-                    if(!aliveM->empty()) continue;
-                    if(aliveM->category != vm->category) continue;
-                    if(vm->deployType == VMType::SINGLE) {
-                        if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
-                    } else {
-                        if(!aliveM->canDeployVM(vm)) continue;
-                    }
-                    canSteal = true;
-                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                    break;
-                }
+                // for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                //     aliveM = top.second;
+                //     if(!aliveM->empty()) continue;
+                //     if(aliveM->category != vm->category) continue;
+                //     if(vm->deployType == VMType::SINGLE) {
+                //         if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                //     } else {
+                //         if(!aliveM->canDeployVM(vm)) continue;
+                //     }
+                //     canSteal = true;
+                //     aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                //     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //     break;
+                // }
                 if(!canSteal) {
                     ServerType *m;
                     for (auto &am : machineListForSort) {
@@ -367,6 +573,10 @@ private:
                     aliveM = Server::newServer(*m);
                     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
+                    // loacte
+                    // locateSimulationServer.getServerShadow(aliveM);
+                    // aliveM = locateSimulationServer.getServerShadow(aliveM);
+                    
                     #ifdef TEST
                         hardwareCost += aliveM->hardwareCost;
                         totalCost += aliveM->hardwareCost;
