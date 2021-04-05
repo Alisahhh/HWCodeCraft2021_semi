@@ -226,9 +226,10 @@ private:
                           std::vector<Server *> &purchaseList) {
         if(addQueryList.size() == 0) return;
         bool canLocateFlag = false;
+        const int highExpDay = 350;
 
         calcQueryListResource(addQueryList);
-        volatile double param = 1.2;
+        volatile double param = 1.6;
         if (isPeak) param = 1.0;
         auto deployType = addQueryList[0].first->deployType;
         if(dailyMaxMemInPerType[deployType][1] != 0)
@@ -261,7 +262,7 @@ private:
                             else return true;
                         }
                     }
-                    if(day > 500) {
+                    if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -298,7 +299,7 @@ private:
                 return a->category < b->category;
             } else {
                 if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
-                    if(day > 500) {
+                    if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -335,7 +336,7 @@ private:
                 return a->category < b->category;
             } else {
                 if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
-                    if(day > 500) {
+                    if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
