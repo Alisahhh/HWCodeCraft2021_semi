@@ -658,8 +658,8 @@ class Migrator {
             sortPMByDailyCost(nonEmptyPMIdList[nodeType]);
         }
 
-        int ableToMigCnt[2] = {(limit * emptyPMIdList[0].size()) / emptyCnt,
-                               (limit * emptyPMIdList[1].size()) / emptyCnt};
+        int ableToMigCnt[2] = {(limit * (int)emptyPMIdList[0].size()) / emptyCnt,
+                               (limit * (int)emptyPMIdList[1].size()) / emptyCnt};
         int migCnt = 0;
         const int pmPoolLimit = 5;
         const int ignoreMigTimesLimit = 10;
@@ -678,7 +678,7 @@ class Migrator {
                     continue;
 
                 auto canDeployFlag = false;
-                auto minRemainResourceWeightedSum = INT32_MAX;
+                int minRemainResourceWeightedSum = INT32_MAX;
                 auto minVMId = -1;
                 auto minType = Server::DUAL_NODE;
                 int pmPoolIndex = nonEmptyPMIdList[nodeType].size();

@@ -76,9 +76,9 @@ public:
                 lastDayLeftMigCnt = limit;
             }
 
-
+#ifdef TEST
             checkUsedRate();
-
+#endif
             //auto queryList = queryListK[day % K];
             auto queryList = io->readDayQueries();
             calcDailyResource(queryList);
