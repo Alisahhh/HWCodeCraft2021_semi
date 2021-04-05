@@ -27,7 +27,10 @@ public:
         bool finFlag = false;
         for (int i = 0; i < 2; i++) {
             for (auto &pm : aliveMachineList[i]) {
-                if (pm.second->empty()) continue;
+                if (pm.second->empty()) {
+                    emptyPMCnt++;
+                    continue;
+                }
                 pmIdList[i].push_back(pm.first);
                 pmIdListForVMSelect[i].push_back(pm.first);
             }
@@ -512,6 +515,8 @@ private:
     volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4, 0.4};
     volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
+    int emptyPMCnt = 0;
+
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
 
@@ -595,9 +600,104 @@ private:
         // return std::abs((pm->getLeftCPU(dn) - vm->cpu) - (pm->getLeftMemory(dn) - vm->memory));
     }
 
+    int compareAliveM(Server *nowNode, Server *lastNode, VM *vm, Server::DeployNode deployNode,
+                             Server::DeployNode lastDeployNode = Server::NODE_0) {
+        if (nowNode->getCategory(deployNode) != lastNode->getCategory(lastDeployNode)) {
+            if (nowNode->getCategory(deployNode) == vm->category) {
+                return -1;
+            }
+            if (lastNode->getCategory(lastDeployNode) == vm->category) {
+                return 1;
+            }
+            if (vm->category == Category::MORE_CPU && lastNode->getCategory(lastDeployNode) == Category::MORE_MEMORY) {
+                return -1;
+            }
+            if (vm->category == Category::MORE_CPU && nowNode->getCategory(deployNode) == Category::MORE_MEMORY) {
+                return 1;
+            }
+            if (vm->category == Category::MORE_MEMORY && lastNode->getCategory(lastDeployNode) == Category::MORE_CPU) {
+                return -1;
+            }
+            if (vm->category == Category::MORE_MEMORY && nowNode->getCategory(deployNode) == Category::MORE_CPU) {
+                return 1;
+            }
+        }
+        if (lastNode->empty() != nowNode->empty()) {
+            if (nowNode->empty()) return 1;
+            if (lastNode->empty()) return -1;
+        }
+
+        if (lastNode->empty() && nowNode->empty()) {
+            if (lastNode->energyCost < nowNode->energyCost) {
+                return 1;
+            }
+            if (lastNode->energyCost > nowNode->energyCost) {
+                return -1;
+            }
+        }
+
+        if (deployNode == Server::DeployNode::DUAL_NODE) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) <= 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) <= 0) {
+                return -1;
+            }
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) > 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
+                return 1;
+            }
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
+                     (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
+                return -1;
+            }
+            return 1;
+            /*
+            if (getRemainResourceWeightedSum(lastNode, vm, lastDeployNode) > getRemainResourceWeightedSum(nowNode, vm, deployNode)){
+                return -1;
+            }else{
+                return 1;
+            }
+            */
+        } else {
+            int nowCPU, nowMem, lastCPU, lastMem;
+            if (deployNode == Server::NODE_0) {
+                nowCPU = nowNode->getLeftCPU(Server::NODE_0);
+                nowMem = nowNode->getLeftMemory(Server::NODE_0);
+            } else {
+                nowCPU = nowNode->getLeftCPU(Server::NODE_1);
+                nowMem = nowNode->getLeftMemory(Server::NODE_1);
+            }
+            if (lastDeployNode == Server::NODE_0) {
+                lastCPU = lastNode->getLeftCPU(Server::NODE_0);
+                lastMem = lastNode->getLeftMemory(Server::NODE_0);
+            } else {
+                lastCPU = lastNode->getLeftCPU(Server::NODE_1);
+                lastMem = lastNode->getLeftMemory(Server::NODE_1);
+            }
+            if (nowCPU <= lastCPU && nowMem <= lastMem) {
+                return -1;
+            }
+            if (nowCPU > lastCPU && nowMem > lastMem) {
+                return 1;
+            }
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
+                return -1;
+            }
+            return 1;
+            /*
+            if (getRemainResourceWeightedSum(lastNode, vm, lastDeployNode) > getRemainResourceWeightedSum(nowNode, vm, deployNode)){
+                return -1;
+            }else{
+                return 1;
+            }
+            */
+        }
+    }
+
     int findPM(std::vector<int> &pmIdList, int outPmID, VM *vm, VMType::DeployType deployType, int &type, int &pos) {
         int targetPMId = -1;
-        int targetType = -1;
+        ServerType::DeployNode targetType = ServerType::DUAL_NODE;
         int position = -1;
         int L = 0, R = pmIdList.size() - 1;
         int ans = pmIdList.size();
@@ -632,6 +732,7 @@ private:
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
+                    /*
                     if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum = getRemainResourceWeightedSum(curPM, vm);
                         //findCnt++;
@@ -644,6 +745,13 @@ private:
                             minusCnt++;
                         }
                     }
+                    */
+                   if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE, ServerType::DUAL_NODE) < 0){
+                       targetPMId = curPM->id;
+                       targetType = ServerType::DUAL_NODE;
+                       position = i;
+                       minusCnt++;
+                   }
                 }
             }
         } else if (deployType == VMType::SINGLE) {
@@ -677,6 +785,7 @@ private:
 
                 if (FlagA) {
                     //findCnt++;
+                    
                     remainResourceWeightedSum =
                             getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
@@ -686,9 +795,18 @@ private:
                         curMinimalRemainder = remainResourceWeightedSum;
                         minusCnt++;
                     }
+                    /*
+                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::NODE_0, targetType) < 0){
+                       targetPMId = curPM->id;
+                       targetType = Server::NODE_0;
+                       position = i;
+                       minusCnt++;
+                   }
+                   */
                 }
                 if (FlagB) {
                     //findCnt++;
+                    
                     remainResourceWeightedSum =
                             getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
@@ -698,6 +816,14 @@ private:
                         curMinimalRemainder = remainResourceWeightedSum;
                         minusCnt++;
                     }
+                    /*
+                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::NODE_1, targetType) < 0){
+                       targetPMId = curPM->id;
+                       targetType = Server::NODE_1;
+                       position = i;
+                       minusCnt++;
+                   }
+                   */
                 }
                 //if(minusCnt > 3 ) break;
             }
