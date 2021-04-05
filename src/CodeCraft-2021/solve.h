@@ -63,14 +63,17 @@ public:
             std::vector<std::tuple<int, int, Server::DeployNode>> migrationList; // 0: vmID, 1: serverID, 2: deployNode
             std::vector<std::pair<Server *, Server::DeployNode>> deployList;
 
+            static int lastDayLeftMigCnt = 0;
+            //if(isPeak) lastDayLeftMigCnt = 0;
             // migration
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                //limit -= migrator->clearHighExpensesPMs(day, limit>>2, migrationList);
+                limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
+                lastDayLeftMigCnt = limit;
             }
 
 
