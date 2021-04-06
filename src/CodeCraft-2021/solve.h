@@ -99,7 +99,7 @@ public:
 #endif
                 emergencyGroupLimit = INT32_MAX;
                 commonGroupLimit = INT32_MAX;
-                
+
                 migrator->setCurPMGroup(1);
                 emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.2);
                 emergencyGroupLimit -= migrator->combineLowLoadRatePM(day, emergencyGroupLimit, migrationList);
@@ -173,11 +173,25 @@ public:
                     if(vmAddRecord[vm->id].first == true && day -vmAddRecord[vm->id].second < 100){
                         vmAliveTimeCnt[(day -vmAddRecord[vm->id].second) / 10] ++;
                     }
+                    if(vmAddRecord[vm->id].first == true && day -vmAddRecord[vm->id].second < 1000){
+                        vmAliveTimeCntHun[(day -vmAddRecord[vm->id].second) / 100] ++;
+                    }
 
                     vmAddRecord.erase(vm->id);
                     auto server = Server::getDeployServer(query->vmID);
                     server->remove(vm);
                     VM::removeVM(vm->id);
+                }
+            }
+
+            if (day == T){
+                for(auto var:vmAddRecord){
+                    if(var.second.first == true && day -var.second.second < 100){
+                        vmAliveTimeCnt[(day -var.second.second) / 10] ++;
+                    }
+                    if(var.second.first == true && day -var.second.second < 1000){
+                        vmAliveTimeCntHun[(day -var.second.second) / 100] ++;
+                    }
                 }
             }
 
@@ -228,6 +242,8 @@ private:
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
     int vmAliveTimeCnt[10] = {0};
+    int vmAliveTimeCntHun[10] = {0};
+
 
     StdIO *io;
     CommonData *commonData;
@@ -759,7 +775,7 @@ private:
             }
 
             fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);
-
+            fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCntHun[0],vmAliveTimeCntHun[1],vmAliveTimeCntHun[2],vmAliveTimeCntHun[3],vmAliveTimeCntHun[4],vmAliveTimeCntHun[5],vmAliveTimeCntHun[6],vmAliveTimeCntHun[7],vmAliveTimeCntHun[8],vmAliveTimeCntHun[9]);
             std::clog << std::endl;
         }
     }
