@@ -41,13 +41,13 @@ public:
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
-        /*queryListK.resize(K);
+        queryListK.resize(K);
         for (int i = 1; i <= K; i++) {
 #ifdef TEST
             std::clog << "READ DAY " << i << ", STORED IN " << i % K << std::endl;
 #endif
             queryListK[i % K] = io->readDayQueries();
-        }*/
+        }
         time_t startTime, endTime, timeSum = 0; // DEBUG USE
         time_t migTimeSum = 0; // DEBUG USE
         startTime = clock(); // DEBUG USE
@@ -67,7 +67,19 @@ public:
             std::vector<std::tuple<int, int, Server::DeployNode>> migrationList; // 0: vmID, 1: serverID, 2: deployNode
             std::vector<std::pair<Server *, Server::DeployNode>> deployList;
 
-            auto queryList = io->readDayQueries();
+            auto queryList = queryListK[day % K];
+            if (day != 1 && day + K - 1 <= T) {
+                //std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
+                queryListK[(day + K - 1) % K] = io->readDayQueries();
+            }
+
+            vmDieInK.clear();
+            vmAddRecordInK.clear();
+
+            for(int i=0;i<K;i++){
+                calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
+            }
+
             int emergencyGroupDelCnt = 0;
             int commonGroupDelCnt = 0;
 
@@ -241,6 +253,8 @@ private:
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
+    std::unordered_map<int, int> vmAddRecordInK;
+    std::set<int> vmDieInK;
     int vmAliveTimeCnt[10] = {0};
     int vmAliveTimeCntHun[10] = {0};
 
@@ -591,6 +605,18 @@ private:
             dailyMaxMemInPerType[vm->deployType][vm->category] = std::max(
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
+        }
+    }
+
+    void calcVmAliveDays(const std::vector<Query *> &queryList, int K, int day){
+        for (auto &query : queryList) {
+            if (query->type == Query::DEL) {
+                if (vmAddRecordInK.find(query->vmID) != vmAddRecordInK.end()) {
+                    vmDieInK.insert(query->vmID);
+                }
+            } else {
+                vmAddRecordInK[query->vmID] = day;
+            }
         }
     }
 
