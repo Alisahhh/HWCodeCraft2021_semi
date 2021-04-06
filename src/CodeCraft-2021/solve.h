@@ -414,20 +414,48 @@ private:
             if (!canLocateFlag) {
                 Server *aliveM = nullptr;
                 bool canSteal = false;
+                std::vector<Server*>stealMachine;
+
                 for(auto top : aliveMachineList[vm->deployType ^ 1]){
                     aliveM = top.second;
                     if(!aliveM->empty()) continue;
                     if(aliveM->category != vm->category) continue;
+                    stealMachine.push_back(aliveM);
+                    // if(vm->deployType == VMType::SINGLE) {
+                    //     if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                    // } else {
+                    //     if(!aliveM->canDeployVM(vm)) continue;
+                    // }
+                    // canSteal = true;
+                    // aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                    // aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    // break;
+                }
+                // sort(stealMachine.begin(), stealMachine.end(), [vm, this](ServerType *a, ServerType *b){
+                //     // if (a->category != b->category) {
+                //     //     if(a->category == vm->category) {
+                //     //         return true;
+                //     //     }
+                //     //     if(b->category == vm->category) {
+                //     //         return false;
+                //     //     }
+                //     // }
+                //     return a->energyCost < b->energyCost;
+                // });
+
+                for(auto &server : stealMachine) {
                     if(vm->deployType == VMType::SINGLE) {
-                        if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                        if(!server->canDeployVM(vm, Server::NODE_0)) continue;
                     } else {
-                        if(!aliveM->canDeployVM(vm)) continue;
+                        if(!server->canDeployVM(vm)) continue;
                     }
                     canSteal = true;
-                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                    aliveM = server;
+                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
                     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                     break;
                 }
+
                 if(!canSteal) {
                     ServerType *m;
                     for (auto &am : machineListForSort[vm->category]) {
@@ -547,7 +575,7 @@ private:
         }
     }
 
-    static int compareAliveM(Server *nowNode, Server *lastNode, VM *vm, Server::DeployNode deployNode,
+    int compareAliveM(Server *nowNode, Server *lastNode, VM *vm, Server::DeployNode deployNode,
                              Server::DeployNode lastDeployNode = Server::NODE_0) {
         if (nowNode->getCategory(deployNode) != lastNode->getCategory(lastDeployNode)) {
             if (nowNode->getCategory(deployNode) == vm->category) {
