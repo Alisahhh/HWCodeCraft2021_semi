@@ -353,112 +353,180 @@ private:
             }
         });
 
-        for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
-            auto vmType = it->first;
-            auto query = it->second;
-            auto vm = VM::newVM(query->vmID, *vmType);
-            canLocateFlag = false;
-            if (vm->deployType == VMType::DeployType::DUAL) {
-                Server *minAlivm = nullptr;
-                for (auto top : aliveMachineList[vm->deployType]) {
-                    auto aliveM = top.second;
-                    if (aliveM->canDeployVM(vm)) {
-                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
-                            minAlivm = aliveM;
+
+        std::queue<std::pair<VMType *, Query *>>addQueryListQueue[5];
+
+        for(auto it = addQueryList.begin(); it != addQueryList.end(); it ++) {
+            addQueryListQueue[it->first->category].push(*it);
+        }
+
+        while(1) {
+            bool endQuery = true;
+            std::pair<VMType *, Query *>queryArray[5];
+            for(int i = 1;i <= 4;i ++) {
+                if(i == 3) continue;
+                if(!addQueryListQueue[i].empty()) {
+                    queryArray[i] = addQueryListQueue[i].front();
+                    endQuery = false;
+                } else {
+                    queryArray[i].first = nullptr;
+                    queryArray[i].second = nullptr;
+                }
+            }
+            if(endQuery) break;
+            bool isSuitable[5] = {false};
+            Server* suitableServer[5] = {nullptr};
+            ServerType::DeployNode suitableType[5];
+
+            for(int i = 1;i <= 4;i ++) {
+                if(i == 3) continue;
+                auto vmType = queryArray[i].first;
+                auto query =  queryArray[i].second;
+                if(vmType == nullptr) continue;
+
+                auto vm = VM::newVM(query->vmID, *vmType);
+                // std::clog << *vm << std::endl;
+                canLocateFlag = false;
+                if (vm->deployType == VMType::DeployType::DUAL) {
+                    Server *minAlivm = nullptr;
+                    for (auto top : aliveMachineList[vm->deployType]) {
+                        auto aliveM = top.second;
+                        if (aliveM->canDeployVM(vm)) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
+                                minAlivm = aliveM;
+                            }
+                            canLocateFlag = true;
                         }
-                        canLocateFlag = true;
+
                     }
 
-                }
-
-                if (canLocateFlag) {
-#ifdef DEBUG_O3
-//                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
-//                    std::clog << minAlivm->toString() << std::endl;
-#endif
-                    minAlivm->deploy(vm, Server::DUAL_NODE);
-                }
-
-            } else {
-                Server *minAlivm = nullptr;
-                Server::DeployNode lastType = Server::DUAL_NODE;
-                for (auto &top : aliveMachineList[vm->deployType]) {
-                    auto aliveM = top.second;
-                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
-                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
-                    if (flagA) {
-                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_0, lastType) < 0) {
-                            minAlivm = aliveM;
-                            lastType = Server::NODE_0;
+                    if (canLocateFlag) {
+    #ifdef DEBUG_O3
+    //                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+    //                    std::clog << minAlivm->toString() << std::endl;
+    #endif
+                        
+                        if(minAlivm->category == vmType->category) {
+                            isSuitable[i] = true;
+                            suitableServer[i] = minAlivm;
+                            suitableType[i] = Server::DUAL_NODE;
                         }
-                        canLocateFlag = true;
+                        // minAlivm->deploy(vm, Server::DUAL_NODE);
                     }
-                    if (flagB) {
-                        if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_1, lastType) < 0) {
-                            minAlivm = aliveM;
-                            lastType = Server::NODE_1;
+
+                } else {
+                    Server *minAlivm = nullptr;
+                    Server::DeployNode lastType = Server::DUAL_NODE;
+                    for (auto &top : aliveMachineList[vm->deployType]) {
+                        auto aliveM = top.second;
+                        int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                        int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                        if (flagA) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_0, lastType) < 0) {
+                                minAlivm = aliveM;
+                                lastType = Server::NODE_0;
+                            }
+                            canLocateFlag = true;
                         }
-                        canLocateFlag = true;
+                        if (flagB) {
+                            if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::NODE_1, lastType) < 0) {
+                                minAlivm = aliveM;
+                                lastType = Server::NODE_1;
+                            }
+                            canLocateFlag = true;
+                        }
                     }
-                }
-                if (canLocateFlag) {
-#ifdef DEBUG_O3
-//                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
-//                    std::clog << minAlivm->toString() << std::endl;
-#endif
-                    minAlivm->deploy(vm, lastType);
+                    if (canLocateFlag) {
+    #ifdef DEBUG_O3
+    //                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+    //                    std::clog << minAlivm->toString() << std::endl;
+    #endif
+                        if(minAlivm->category == vmType->category) {
+                            isSuitable[i] = true;
+                            suitableServer[i] = minAlivm;
+                            suitableType[i] = lastType;
+                        }
+                        // minAlivm->deploy(vm, lastType);
+                    }
                 }
             }
 
-
-            if (!canLocateFlag) {
-                Server *aliveM = nullptr;
-                bool canSteal = false;
-                for(auto top : aliveMachineList[vm->deployType ^ 1]){
-                    aliveM = top.second;
-                    if(!aliveM->empty()) continue;
-                    if(aliveM->category != vm->category) continue;
-                    if(vm->deployType == VMType::SINGLE) {
-                        if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
-                    } else {
-                        if(!aliveM->canDeployVM(vm)) continue;
-                    }
-                    canSteal = true;
-                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+            canLocateFlag = false;
+            
+            for(int i = 1;i <= 4;i ++) {
+                if(i == 3) continue;
+                auto vmType = queryArray[i].first;
+                auto query =  queryArray[i].second;
+                if(vmType == nullptr) continue;
+                auto vm = VM::newVM(query->vmID, *vmType);
+                if(isSuitable[i]) {
+                    canLocateFlag = true;
+                    suitableServer[i]->deploy(vm, suitableType[i]);
+                    addQueryListQueue[i].pop();
                     break;
                 }
-                if(!canSteal) {
-                    ServerType *m;
-                    for (auto &am : machineListForSort[vm->category]) {
-                        if (am->canDeployVM(vm)) {
-                            m = am;
-                            break;
+            }    
+            if(canLocateFlag) continue;
+
+            for(int i = 1;i <= 4;i ++)
+            {
+                if(i == 3) continue;
+                auto vmType = queryArray[i].first;
+                auto query =  queryArray[i].second;
+                if(vmType == nullptr) continue;
+                auto vm = VM::newVM(query->vmID, *vmType);
+                {
+                    Server *aliveM = nullptr;
+                    bool canSteal = false;
+                    for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                        aliveM = top.second;
+                        if(!aliveM->empty()) continue;
+                        if(aliveM->category != vm->category) continue;
+                        if(vm->deployType == VMType::SINGLE) {
+                            if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                        } else {
+                            if(!aliveM->canDeployVM(vm)) continue;
+                        }
+                        canSteal = true;
+                        aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                        break;
+                    }
+                    if(!canSteal) {
+                        ServerType *m;
+                        for (auto &am : machineListForSort[vm->category]) {
+                            if (am->canDeployVM(vm)) {
+                                m = am;
+                                break;
+                            }
+                        }
+                        aliveM = Server::newServer(*m);
+                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                        purchaseList.push_back(aliveM);
+                        #ifdef TEST
+                            hardwareCost += aliveM->hardwareCost;
+                            totalCost += aliveM->hardwareCost;
+                        #endif
+                    }
+                    if (vm->deployType == VMType::DUAL) {
+                        if (aliveM->canDeployVM(vm)) {
+                            aliveM->deploy(vm);
+                            canLocateFlag = true;
+                        }
+                    } else {
+                        int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                        int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                        if (flagA) {
+                            aliveM->deploy(vm, Server::NODE_0);
+                            canLocateFlag = true;
+                        } else if (flagB) {
+                            aliveM->deploy(vm, Server::NODE_1);
+                            canLocateFlag = true;
                         }
                     }
-                    aliveM = Server::newServer(*m);
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                    purchaseList.push_back(aliveM);
-                    #ifdef TEST
-                        hardwareCost += aliveM->hardwareCost;
-                        totalCost += aliveM->hardwareCost;
-                    #endif
-                }
-                if (vm->deployType == VMType::DUAL) {
-                    if (aliveM->canDeployVM(vm)) {
-                        aliveM->deploy(vm);
-                        canLocateFlag = true;
-                    }
-                } else {
-                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
-                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
-                    if (flagA) {
-                        aliveM->deploy(vm, Server::NODE_0);
-                        canLocateFlag = true;
-                    } else if (flagB) {
-                        aliveM->deploy(vm, Server::NODE_1);
-                        canLocateFlag = true;
-                    }
+                    addQueryListQueue[i].pop();
+                    break;
+
                 }
             }
         }
