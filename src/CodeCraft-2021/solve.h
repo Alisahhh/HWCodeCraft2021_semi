@@ -17,7 +17,7 @@ class Solver {
 public:
     Solver() {
         io = new StdIO();
-        migrator = new Migrator(aliveMachineList);
+        // migrator = new Migrator(aliveMachineList);
     }
 
     void solve() {
@@ -71,13 +71,13 @@ public:
             //if(isPeak) lastDayLeftMigCnt = 0;
             // migration
             if (VM::getVMCount() > 100) {
-                auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
-                //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
-                limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
-                lastDayLeftMigCnt = limit;
+                // auto limit = VM::getVMCount() * 3 / 100; // 百分之3
+                // limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
+                // //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
+                // limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
+                // limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
+                // limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
+                // lastDayLeftMigCnt = limit;
             }
 
 #ifdef TEST
@@ -151,9 +151,11 @@ public:
 
 #ifdef TEST
             for (int i = 0; i < 2; i++) {
-                for (auto &aliveM : aliveMachineList[i]) {
-                    if (!aliveM.second->empty()) {
-                        totalCost += aliveM.second->energyCost;
+                for (int j = 0;j < 2;j ++) {
+                    for (auto &aliveM : aliveMachineList[i][j]) {
+                        if (!aliveM.second->empty()) {
+                            totalCost += aliveM.second->energyCost;
+                        }
                     }
                 }
             }
@@ -183,7 +185,7 @@ public:
 private:
     int T;
     int day; // 为了方便我使用时间
-    bool isPeak = false;
+    int isPeak = 0;
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
@@ -192,7 +194,7 @@ private:
 
     StdIO *io;
     CommonData *commonData;
-    Migrator *migrator;
+    // Migrator *migrator;
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
@@ -353,6 +355,8 @@ private:
             }
         });
 
+
+        // std::clog << "????????????" << std::endl;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
@@ -360,7 +364,7 @@ private:
             canLocateFlag = false;
             if (vm->deployType == VMType::DeployType::DUAL) {
                 Server *minAlivm = nullptr;
-                for (auto top : aliveMachineList[vm->deployType]) {
+                for (auto top : aliveMachineList[vm->deployType][isPeak]) {
                     auto aliveM = top.second;
                     if (aliveM->canDeployVM(vm)) {
                         if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
@@ -382,7 +386,7 @@ private:
             } else {
                 Server *minAlivm = nullptr;
                 Server::DeployNode lastType = Server::DUAL_NODE;
-                for (auto &top : aliveMachineList[vm->deployType]) {
+                for (auto &top : aliveMachineList[vm->deployType][isPeak]) {
                     auto aliveM = top.second;
                     int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
                     int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
@@ -414,7 +418,7 @@ private:
             if (!canLocateFlag) {
                 Server *aliveM = nullptr;
                 bool canSteal = false;
-                for(auto top : aliveMachineList[vm->deployType ^ 1]){
+                for(auto top : aliveMachineList[vm->deployType ^ 1][isPeak]){
                     aliveM = top.second;
                     if(!aliveM->empty()) continue;
                     if(aliveM->category != vm->category) continue;
@@ -424,8 +428,8 @@ private:
                         if(!aliveM->canDeployVM(vm)) continue;
                     }
                     canSteal = true;
-                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    aliveMachineList[vm->deployType ^ 1][isPeak].erase(aliveMachineList[vm->deployType ^ 1][isPeak].find(top.first));
+                    aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
                     break;
                 }
                 if(!canSteal) {
@@ -437,7 +441,7 @@ private:
                         }
                     }
                     aliveM = Server::newServer(*m);
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
                     #ifdef TEST
                         hardwareCost += aliveM->hardwareCost;
@@ -541,9 +545,9 @@ private:
         }
         if (dailyMaxCPU[0] + dailyMaxCPU[1] >= PEAK_CPU && dailyMaxMem[0] + dailyMaxMem[1] >= PEAK_MEM) {
             // std::clog << "PEAK DAY: " << day << std::endl;
-            isPeak = true;
+            isPeak = 1;
         } else {
-            isPeak = false;
+            isPeak = 0;
         }
     }
 
@@ -635,7 +639,7 @@ private:
         int resourceEmptyMem[2] = {};
         int emptyMachine[2] = {};
         for (int i = 0; i < 2; i++) {
-            for (auto &aliveM : aliveMachineList[i]) {
+            for (auto &aliveM : aliveMachineList[i][isPeak]) {
                 if (aliveM.second->empty()) {
                     emptyMachine[i]++;
                     continue;
@@ -666,7 +670,7 @@ private:
             int dualLowCnt = 0;
             int dualHighCnt = 0;
 
-            for (auto &pm:aliveMachineList[i]) {
+            for (auto &pm:aliveMachineList[i][isPeak]) {
                 bool cpuHighFlag = false;
                 bool cpuLowFlag = false;
                 bool memHighFlag = false;
@@ -701,7 +705,7 @@ private:
             }
 
             std::clog << cpuEmptyRate << ", " << memEmptyRate << ", "
-                      << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
+                      << aliveMachineList[i][isPeak].size() << ", " << emptyMachine[i] << ", "
                       << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
                       << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
         }
