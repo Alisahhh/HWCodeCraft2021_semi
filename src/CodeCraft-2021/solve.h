@@ -220,7 +220,7 @@ private:
     }
 
     std::vector<ServerType *> machineListForSort[5];
-    std::unordered_map<int, Server *> aliveMachineList[2];
+    std::unordered_map<int, Server *> aliveMachineList[2][2];
 
     void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
                           std::vector<Server *> &purchaseList) {
