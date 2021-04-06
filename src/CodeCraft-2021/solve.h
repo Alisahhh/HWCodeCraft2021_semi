@@ -17,7 +17,7 @@ class Solver {
 public:
     Solver() {
         io = new StdIO();
-        // migrator = new Migrator(aliveMachineList);
+        migrator = new Migrator(aliveMachineList);
     }
 
     void solve() {
@@ -67,25 +67,60 @@ public:
             std::vector<std::tuple<int, int, Server::DeployNode>> migrationList; // 0: vmID, 1: serverID, 2: deployNode
             std::vector<std::pair<Server *, Server::DeployNode>> deployList;
 
+            auto queryList = io->readDayQueries();
+            int emergencyGroupDelCnt = 0;
+            int commonGroupDelCnt = 0;
+
+            calcDailyResource(queryList, emergencyGroupDelCnt, commonGroupDelCnt);
+
             static int lastDayLeftMigCnt = 0;
             //if(isPeak) lastDayLeftMigCnt = 0;
             // migration
             if (VM::getVMCount() > 100) {
-                // auto limit = VM::getVMCount() * 3 / 100; // 百分之3
-                // limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
-                // //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
-                // limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
-                // limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
-                // limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
-                // lastDayLeftMigCnt = limit;
+                int limit = VM::getVMCount() * 3 / 100; // 百分之3
+                int emergencyGroupLimit = 0;
+                int commonGroupLimit = 0;
+                fprintf(stderr, "%d %d\n", emergencyGroupDelCnt, commonGroupDelCnt);
+                if (emergencyGroupDelCnt + commonGroupDelCnt == 0){
+                    emergencyGroupLimit = limit * (aliveMachineList[0][1].size() +  aliveMachineList[1][1].size()) / ( aliveMachineList[0][0].size() +  aliveMachineList[1][0].size()+  aliveMachineList[0][1].size()+  aliveMachineList[1][1].size());
+                    emergencyGroupLimit *= 2;
+                    emergencyGroupLimit += lastDayLeftMigCnt;
+                    commonGroupLimit = limit - emergencyGroupLimit;
+                } else {
+                    emergencyGroupLimit = limit * emergencyGroupDelCnt / (emergencyGroupDelCnt+commonGroupDelCnt);
+                    emergencyGroupLimit *= 2;
+                    emergencyGroupLimit += lastDayLeftMigCnt;
+                    commonGroupLimit = limit - emergencyGroupLimit;
+                }
+
+                // handle emergency gourp mig
+#ifdef TEST
+                fprintf(stderr, "emergency group\n");
+#endif
+                emergencyGroupLimit = INT32_MAX;
+                commonGroupLimit = INT32_MAX;
+                
+                migrator->setCurPMGroup(1);
+                emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.2);
+                emergencyGroupLimit -= migrator->combineLowLoadRatePM(day, emergencyGroupLimit, migrationList);
+                emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.05);
+
+                // handle common group mig
+#ifdef TEST
+                fprintf(stderr, "common group\n");
+#endif
+                migrator->setCurPMGroup(0);
+                //commonGroupLimit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
+                commonGroupLimit -= migrator->migrateScatteredVM(day, commonGroupLimit, migrationList, 0.2);
+                commonGroupLimit -= migrator->combineLowLoadRatePM(day, commonGroupLimit, migrationList);
+                commonGroupLimit -= migrator->migrateScatteredVM(day, commonGroupLimit, migrationList, 0.05);
+                lastDayLeftMigCnt = commonGroupLimit;
             }
 
 #ifdef TEST
             checkUsedRate();
 #endif
             //auto queryList = queryListK[day % K];
-            auto queryList = io->readDayQueries();
-            calcDailyResource(queryList);
             /*if (day != 1 && day + K - 1 <= T) {
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
@@ -138,6 +173,8 @@ public:
                     if(vmAddRecord[vm->id].first == true && day -vmAddRecord[vm->id].second < 100){
                         vmAliveTimeCnt[(day -vmAddRecord[vm->id].second) / 10] ++;
                     }
+
+                    vmAddRecord.erase(vm->id);
                     auto server = Server::getDeployServer(query->vmID);
                     server->remove(vm);
                     VM::removeVM(vm->id);
@@ -194,7 +231,7 @@ private:
 
     StdIO *io;
     CommonData *commonData;
-    // Migrator *migrator;
+    Migrator *migrator;
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
@@ -264,7 +301,7 @@ private:
                             else return true;
                         }
                     }
-                    if(day > highExpDay) {
+                    if(isPeak || day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -301,7 +338,7 @@ private:
                 return a->category < b->category;
             } else {
                 if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
-                    if(day > highExpDay) {
+                    if(isPeak || day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -338,7 +375,7 @@ private:
                 return a->category < b->category;
             } else {
                 if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
-                    if(day > highExpDay) {
+                    if(isPeak || day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -361,6 +398,7 @@ private:
             auto vmType = it->first;
             auto query = it->second;
             auto vm = VM::newVM(query->vmID, *vmType);
+            vmAddRecord[vm->id] = std::make_pair(isPeak, day);
             canLocateFlag = false;
             if (vm->deployType == VMType::DeployType::DUAL) {
                 Server *minAlivm = nullptr;
@@ -508,7 +546,7 @@ private:
         }
     }
 
-    void calcDailyResource(const std::vector<Query *> &queryList) {
+    void calcDailyResource(const std::vector<Query *> &queryList, int &emergencyGroupDelCnt, int &commonGroupDelCnt) {
         memset(dailyMaxCPU, 0, sizeof(dailyMaxCPU));
         memset(dailyMaxMem, 0, sizeof(dailyMaxMem));
         memset(dailyMaxCPUInPerType, 0, sizeof(dailyMaxCPUInPerType));
@@ -517,12 +555,16 @@ private:
         memset(nowCPU, 0, sizeof(nowCPU));
         memset(nowMem, 0, sizeof(nowMem));
 
+        emergencyGroupDelCnt = 0;
+        commonGroupDelCnt = 0;
+
         for (auto &query : queryList) {
             if (query->type == Query::DEL) {
                 auto vm = VM::getVM(query->vmID);
                 nowCPU[vm->deployType][vm->category] -= vm->cpu;
                 nowMem[vm->deployType][vm->category] -= vm->memory;
-
+                if (vmAddRecord[vm->id].first == true) {emergencyGroupDelCnt++;}
+                else {commonGroupDelCnt++;}
             } else {
                 auto vm = commonData->getVMType(query->vmModel);
                 nowCPU[vm->deployType][vm->category] += vm->cpu;
@@ -638,80 +680,87 @@ private:
         int resourceEmptyCPU[2] = {};
         int resourceEmptyMem[2] = {};
         int emptyMachine[2] = {};
-        for (int i = 0; i < 2; i++) {
-            for (auto &aliveM : aliveMachineList[i][isPeak]) {
-                if (aliveM.second->empty()) {
-                    emptyMachine[i]++;
-                    continue;
-                }
-                // if(aliveM.second.empty()) continue;
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
-                resourceTotalCPU[i] += aliveM.second->cpu;
-                resourceTotalMem[i] += aliveM.second->memory;
+        for (int j=0; j < 2; j++){
+            for (int i = 0; i < 2; i++) {
+                resourceTotalCPU[i] = 0;
+                resourceTotalMem[i] = 0;
+                resourceEmptyCPU[i] = 0;
+                resourceEmptyMem[i] = 0;
+                emptyMachine[i] = 0;
+                for (auto &aliveM : aliveMachineList[i][j]) {
+                    if (aliveM.second->empty()) {
+                        emptyMachine[i]++;
+                        continue;
+                    }
+                    // if(aliveM.second.empty()) continue;
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                    resourceTotalCPU[i] += aliveM.second->cpu;
+                    resourceTotalMem[i] += aliveM.second->memory;
 
-            }
-        }
-        for (int i = 0; i < 2; i++) {
-            volatile double cpuEmptyRate = 0;
-            volatile double memEmptyRate = 0;
-
-            if (resourceTotalCPU[i])
-                cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
-            if (resourceTotalMem[i])
-                memEmptyRate = (resourceEmptyMem[i] + 0.0) / resourceTotalMem[i];
-
-            int cpuLowCnt = 0;
-            int cpuHighCnt = 0;
-            int memLowCnt = 0;
-            int memHighCnt = 0;
-            int dualLowCnt = 0;
-            int dualHighCnt = 0;
-
-            for (auto &pm:aliveMachineList[i][isPeak]) {
-                bool cpuHighFlag = false;
-                bool cpuLowFlag = false;
-                bool memHighFlag = false;
-                bool memLowFlag = false;
-
-                if (pm.second->empty()) continue;
-
-                if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
-                         (0.1 * pm.second->cpu)) < 0)
-                    cpuHighFlag = true;
-                if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
-                         (0.7 * pm.second->cpu)) > 0)
-                    cpuLowFlag = true;
-                if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
-                         (0.1 * pm.second->memory)) < 0)
-                    memHighFlag = true;
-                if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
-                         (0.7 * pm.second->memory)) > 0)
-                    memLowFlag = true;
-
-                if (cpuHighFlag && memHighFlag)
-                    dualHighCnt++;
-                else if (cpuLowFlag && memLowFlag)
-                    dualLowCnt++;
-                else {
-                    if (cpuLowFlag) cpuLowCnt++;
-                    else if (cpuHighFlag) cpuHighCnt++;
-
-                    if (memLowFlag) memLowCnt++;
-                    else if (memHighFlag) memHighCnt++;
                 }
             }
+            for (int i = 0; i < 2; i++) {
+                volatile double cpuEmptyRate = 0;
+                volatile double memEmptyRate = 0;
 
-            std::clog << cpuEmptyRate << ", " << memEmptyRate << ", "
-                      << aliveMachineList[i][isPeak].size() << ", " << emptyMachine[i] << ", "
-                      << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
-                      << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+                if (resourceTotalCPU[i])
+                    cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
+                if (resourceTotalMem[i])
+                    memEmptyRate = (resourceEmptyMem[i] + 0.0) / resourceTotalMem[i];
+
+                int cpuLowCnt = 0;
+                int cpuHighCnt = 0;
+                int memLowCnt = 0;
+                int memHighCnt = 0;
+                int dualLowCnt = 0;
+                int dualHighCnt = 0;
+
+                for (auto &pm:aliveMachineList[i][j]) {
+                    bool cpuHighFlag = false;
+                    bool cpuLowFlag = false;
+                    bool memHighFlag = false;
+                    bool memLowFlag = false;
+
+                    if (pm.second->empty()) continue;
+
+                    if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
+                            (0.1 * pm.second->cpu)) < 0)
+                        cpuHighFlag = true;
+                    if (fcmp((pm.second->getLeftCPU(Server::NODE_0) + pm.second->getLeftCPU(Server::NODE_1)) -
+                            (0.7 * pm.second->cpu)) > 0)
+                        cpuLowFlag = true;
+                    if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
+                            (0.1 * pm.second->memory)) < 0)
+                        memHighFlag = true;
+                    if (fcmp((pm.second->getLeftMemory(Server::NODE_0) + pm.second->getLeftMemory(Server::NODE_1)) -
+                            (0.7 * pm.second->memory)) > 0)
+                        memLowFlag = true;
+
+                    if (cpuHighFlag && memHighFlag)
+                        dualHighCnt++;
+                    else if (cpuLowFlag && memLowFlag)
+                        dualLowCnt++;
+                    else {
+                        if (cpuLowFlag) cpuLowCnt++;
+                        else if (cpuHighFlag) cpuHighCnt++;
+
+                        if (memLowFlag) memLowCnt++;
+                        else if (memHighFlag) memHighCnt++;
+                    }
+                }
+
+                std::clog << cpuEmptyRate << ", " << memEmptyRate << ", "
+                        << aliveMachineList[i][j].size() << ", " << emptyMachine[i] << ", "
+                        << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
+                        << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+            }
+
+            fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);
+
+            std::clog << std::endl;
         }
-
-        fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);
-
-        std::clog << std::endl;
     }
 };
