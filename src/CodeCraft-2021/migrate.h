@@ -14,8 +14,13 @@
 
 class Migrator {
   public:
-    Migrator(std::unordered_map<int, Server *> *_aliveMachineList) {
+    Migrator(std::unordered_map<int, Server *> (*_aliveMachineList)[2]) {
         aliveMachineList = _aliveMachineList;
+    }
+
+    void setCurPMGroup(int g){
+        if(g != 0 && g!= 1) return;
+        curPMGroup = g;
     }
 
     int migrateScatteredVM(
@@ -30,7 +35,7 @@ class Migrator {
         int migCnt = 0;
         bool finFlag = false;
         for (int i = 0; i < 2; i++) {
-            for (auto &pm : aliveMachineList[i]) {
+            for (auto &pm : aliveMachineList[i][curPMGroup]) {
                 if (pm.second->empty()) {
                     emptyPMCnt++;
                     continue;
@@ -64,9 +69,9 @@ class Migrator {
                 i = 0;
             } else {
                 auto pmOneNode =
-                    aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
+                    aliveMachineList[0][curPMGroup][pmIdListForVMSelect[0][onePnt]];
                 auto pmTwoNode =
-                    aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
+                    aliveMachineList[1][curPMGroup][pmIdListForVMSelect[1][twoPnt]];
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
@@ -121,7 +126,7 @@ class Migrator {
                 placeVM(outPMId, inPMID, localVMID,
                         static_cast<ServerType::DeployNode>(type));
                 if (type == Server::NODE_0 || type == Server::NODE_1) {
-                    auto pm = aliveMachineList[i][inPMID];
+                    auto pm = aliveMachineList[i][curPMGroup][inPMID];
                     treeArray[i].update(
                         pmIdList[i].size() - pos,
                         std::make_pair(
@@ -129,7 +134,7 @@ class Migrator {
                                      pm->getLeftCPU(Server::NODE_1)),
                             std::max(pm->getLeftMemory(Server::NODE_0),
                                      pm->getLeftMemory(Server::NODE_1))));
-                    pm = aliveMachineList[i][outPMId];
+                    pm = aliveMachineList[i][curPMGroup][outPMId];
                     treeArray[i].update(
                         pmIdList[i].size() - onePnt + 1,
                         std::make_pair(
@@ -138,12 +143,12 @@ class Migrator {
                             std::max(pm->getLeftMemory(Server::NODE_0),
                                      pm->getLeftMemory(Server::NODE_1))));
                 } else {
-                    auto pm = aliveMachineList[i][inPMID];
+                    auto pm = aliveMachineList[i][curPMGroup][inPMID];
                     treeArray[i].update(
                         pmIdList[i].size() - pos,
                         std::make_pair(pm->getLeftCPU(Server::NODE_0),
                                        pm->getLeftMemory(Server::NODE_1)));
-                    pm = aliveMachineList[i][outPMId];
+                    pm = aliveMachineList[i][curPMGroup][outPMId];
                     treeArray[i].update(
                         pmIdList[i].size() - twoPnt + 1,
                         std::make_pair(
@@ -186,7 +191,7 @@ class Migrator {
         bool finFlag = false;
 
         for (int i = 0; i < 2; i++) {
-            for (auto &pm : aliveMachineList[i]) {
+            for (auto &pm : aliveMachineList[i][curPMGroup]) {
                 if (pm.second->empty())
                     continue;
                 pmIdAllList[i].push_back(pm.first);
@@ -215,8 +220,8 @@ class Migrator {
                 outPMId = pmIdAllList[0][onePnt++];
                 i = 0;
             } else {
-                auto pmOneNode = aliveMachineList[0][pmIdAllList[0][onePnt]];
-                auto pmTwoNode = aliveMachineList[1][pmIdAllList[1][twoPnt]];
+                auto pmOneNode = aliveMachineList[0][curPMGroup][pmIdAllList[0][onePnt]];
+                auto pmTwoNode = aliveMachineList[1][curPMGroup][pmIdAllList[1][twoPnt]];
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
@@ -232,7 +237,7 @@ class Migrator {
                 }
             }
 
-            auto pm = aliveMachineList[i][outPMId];
+            auto pm = aliveMachineList[i][curPMGroup][outPMId];
             const double migRate = 0.3;
             if (fcmp(pm->getCPUUsage() - thr) > 0 &&
                 fcmp(pm->getMemoryUsage() - thr) > 0) {
@@ -642,7 +647,7 @@ class Migrator {
         int emptyCnt = 0;
 
         for (int nodeType = 0; nodeType < 2; nodeType++) {
-            for (auto &pm : aliveMachineList[nodeType]) {
+            for (auto &pm : aliveMachineList[nodeType][curPMGroup]) {
                 if (pm.second->empty()) {
                     emptyPMIdList[nodeType].push_back(pm.first);
                     emptyCnt++;
@@ -837,16 +842,17 @@ class Migrator {
     volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     int emptyPMCnt = 0;
+    int curPMGroup = -1;
 
-    std::unordered_map<int, Server *> *aliveMachineList;
+    std::unordered_map<int, Server *> (*aliveMachineList)[2];
     BinIndexTree treeArray[2];
 
     int sortPMByRemainAmount(VMType::DeployType deployType,
                              std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [deployType, this](int &pmIdi, int &pmIdj) {
-                      auto pmi = aliveMachineList[deployType][pmIdi];
-                      auto pmj = aliveMachineList[deployType][pmIdj];
+                      auto pmi = aliveMachineList[deployType][curPMGroup][pmIdi];
+                      auto pmj = aliveMachineList[deployType][curPMGroup][pmIdj];
 
                       return fcmp((pmi->getLeftCPU(Server::NODE_0) +
                                    pmi->getLeftCPU(Server::NODE_1) +
@@ -862,7 +868,7 @@ class Migrator {
         treeArray[deployType].setSize(pmIdList.size());
         for (int i = 1; i <= pmIdList.size(); i++) {
             Server *pm =
-                aliveMachineList[deployType][pmIdList[pmIdList.size() - i]];
+                aliveMachineList[deployType][curPMGroup][pmIdList[pmIdList.size() - i]];
             if (deployType == VMType::SINGLE) {
                 treeArray[deployType].update(
                     i, std::make_pair(
@@ -935,8 +941,8 @@ class Migrator {
                            std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [deployType, this](int &pmIdi, int &pmIdj) {
-                      auto pmi = aliveMachineList[deployType][pmIdi];
-                      auto pmj = aliveMachineList[deployType][pmIdj];
+                      auto pmi = aliveMachineList[deployType][curPMGroup][pmIdi];
+                      auto pmj = aliveMachineList[deployType][curPMGroup][pmIdj];
 
                       return fcmp((pmi->cpu - pmi->getLeftCPU() +
                                    (pmi->memory - pmi->getLeftMemory()) *
@@ -1083,7 +1089,7 @@ class Migrator {
             }
         }
 
-        auto outPM = aliveMachineList[deployType][outPmID];
+        auto outPM = aliveMachineList[deployType][curPMGroup][outPmID];
         // int curMinimalRemainder = getRemainResourceWeightedSum(outPM, vm,
         // Server::getDeployInfo(vm->id).second);
         int curMinimalRemainder = INT32_MAX;
@@ -1099,7 +1105,7 @@ class Migrator {
                 if (*curPMId == outPmID)
                     continue;
 
-                auto curPM = aliveMachineList[deployType][*curPMId];
+                auto curPM = aliveMachineList[deployType][curPMGroup][*curPMId];
                 // fprintf(stderr,"curpmP %d %d
                 // %d\n",*curPMId,curPM->getLeftCPU(),curPM->getLeftMemory());
                 // avoid startup an empty machine
@@ -1138,7 +1144,7 @@ class Migrator {
                 // avoid migrating vm to even lower load machines or to the same
                 // machine
 
-                auto curPM = aliveMachineList[deployType][*curPMId];
+                auto curPM = aliveMachineList[deployType][curPMGroup][*curPMId];
                 // avoid startup an empty machine
                 if (curPM->empty())
                     continue;
