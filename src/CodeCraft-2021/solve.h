@@ -33,7 +33,8 @@ public:
         for (auto &i : serverTypeList) {
             testData.push_back({{(double) i->hardwareCost / i->energyCost}, i});
         }
-        auto kMeansResultTmp = kMeans->kMeans(testData, 3);
+        auto kMeansResultTmp = kMeans->kMeans(testData);
+        delete kMeans;
         std::vector<std::vector<ServerType *>> kMeansResult;
         for (auto &i : kMeansResultTmp) {
             std::vector<ServerType *> tmp;
