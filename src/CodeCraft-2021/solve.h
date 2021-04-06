@@ -27,7 +27,8 @@ public:
         commonData = new CommonData(serverTypeList, vmTypeList);
         for(int i = 1;i <= 4;i ++) {
             if(i == 3) continue;
-            machineListForSort[i] = serverTypeList;
+            machineListForSort[i][0] = serverTypeList;
+            machineListForSort[i][1] = serverTypeList;
         }
         
 #ifdef TEST
@@ -109,8 +110,8 @@ public:
 #ifdef TEST
                 fprintf(stderr, "emergency group\n");
 #endif
-                emergencyGroupLimit = INT32_MAX;
-                commonGroupLimit = INT32_MAX;
+                // emergencyGroupLimit = INT32_MAX;
+                // commonGroupLimit = INT32_MAX;
 
                 migrator->setCurPMGroup(1);
                 emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.2);
@@ -288,7 +289,7 @@ private:
         }
     }
 
-    std::vector<ServerType *> machineListForSort[5];
+    std::vector<ServerType *> machineListForSort[5][2];
     std::unordered_map<int, Server *> aliveMachineList[2][2];
 
     void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
@@ -299,10 +300,10 @@ private:
 
         calcQueryListResource(addQueryList);
         volatile double param = 1.6;
-        if (isPeak) param = 1.0;
+        
         auto deployType = addQueryList[0].first->deployType;
         if(dailyMaxMemInPerType[deployType][1] != 0)
-        std::sort(machineListForSort[1].begin(), machineListForSort[1].end(), 
+        std::sort(machineListForSort[1][0].begin(), machineListForSort[1][0].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
             volatile double k = dailyMaxCPUInPerType[deployType][1] /
                                 dailyMaxMemInPerType[deployType][1];
@@ -331,7 +332,7 @@ private:
                             else return true;
                         }
                     }
-                    if(isPeak || day > highExpDay) {
+                    if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -348,45 +349,9 @@ private:
             }
         });
 
-        if(dailyMaxMemInPerType[deployType][2] != 0) 
-        std::sort(machineListForSort[2].begin(), machineListForSort[2].end(), 
-        [param, deployType, this](ServerType *a, ServerType *b) {
-            volatile double k = dailyMaxCPUInPerType[deployType][2] /
-                                dailyMaxMemInPerType[deployType][2];
-            volatile double k1 = a->cpu / a->memory;
-            volatile double k2 = b->cpu / b->memory;
-
-            volatile double absKa = fabs(k1 - k);
-            volatile double absKb = fabs(k2 - k);
-            if (a->category != b->category) {
-                if (a->category == 2) {
-                    return true;
-                }
-                if (b->category == 2) {
-                    return false;
-                }
-                return a->category < b->category;
-            } else {
-                if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
-                    if(isPeak || day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
-                        if(aK == bK) {
-                            return a->hardwareCost < b->hardwareCost;
-                        } else {
-                            return aK < bK;
-                        }
-                    }
-                    return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
-                } else {
-                    return fcmp(absKa - absKb) < 0;
-                }
-            }
-        });
-
+        
         if(dailyMaxMemInPerType[deployType][4] != 0) 
-        std::sort(machineListForSort[4].begin(), machineListForSort[4].end(), 
+        std::sort(machineListForSort[4][0].begin(), machineListForSort[4][0].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
             volatile double k = dailyMaxCPUInPerType[deployType][4] /
                                 dailyMaxMemInPerType[deployType][4];
@@ -405,7 +370,7 @@ private:
                 return a->category < b->category;
             } else {
                 if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
-                    if(isPeak || day > highExpDay) {
+                    if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
                         if(aK == bK) {
@@ -422,17 +387,170 @@ private:
             }
         });
 
+        if(dailyMaxMemInPerType[deployType][2] != 0) 
+        std::sort(machineListForSort[2][0].begin(), machineListForSort[2][0].end(), 
+        [param, deployType, this](ServerType *a, ServerType *b) {
+            volatile double k = dailyMaxCPUInPerType[deployType][2] /
+                                dailyMaxMemInPerType[deployType][2];
+            volatile double k1 = a->cpu / a->memory;
+            volatile double k2 = b->cpu / b->memory;
+
+            volatile double absKa = fabs(k1 - k);
+            volatile double absKb = fabs(k2 - k);
+            if (a->category != b->category) {
+                if (a->category == 2) {
+                    return true;
+                }
+                if (b->category == 2) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
+                    if(day > highExpDay) {
+                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        if(aK == bK) {
+                            return a->hardwareCost < b->hardwareCost;
+                        } else {
+                            return aK < bK;
+                        }
+                    }
+                    return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
+                                (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
+                } else {
+                    return fcmp(absKa - absKb) < 0;
+                }
+            }
+        });
+
+        if (isPeak) param = 1.0;
+
+        if(dailyMaxMemInPerType[deployType][1] != 0)
+        std::sort(machineListForSort[1][1].begin(), machineListForSort[1][1].end(), 
+        [param, deployType, this](ServerType *a, ServerType *b) {
+            volatile double k = dailyMaxCPUInPerType[deployType][1] /
+                                dailyMaxMemInPerType[deployType][1];
+            volatile double k1 = a->cpu / a->memory;
+            volatile double k2 = b->cpu / b->memory;
+
+            volatile double absKa = fabs(k1 - k);
+            volatile double absKb = fabs(k2 - k);
+            if (a->category != b->category) {
+                if (a->category == 1) {
+                    return true;
+                }
+                if (b->category == 1) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                if (fcmp(absKa - 0.5) < 0 && fcmp(absKb - 0.5) < 0) {
+                    if((fcmp(k1 -1) > 0 && fcmp(k2 -1) < 0) || (fcmp(k1 -1) < 0 && fcmp(k2 -1) > 0)) {
+                        if(fcmp(k -1) > 0) {
+                            if(fcmp(k1 -1) > 0) return true;
+                            else return false;
+                        }
+                        if(fcmp(k -1) < 0) {
+                            if(fcmp(k1 - 1) > 0) return false;
+                            else return true;
+                        }
+                    }                    
+                    int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
+                    int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                    if(aK == bK) {
+                        return a->hardwareCost < b->hardwareCost;
+                    } else {
+                        return aK < bK;
+                    }
+                } else {
+                    return fcmp(absKa - absKb) < 0;
+                }
+            }
+        });
+
+        if(dailyMaxMemInPerType[deployType][2] != 0) 
+        std::sort(machineListForSort[2][1].begin(), machineListForSort[2][1].end(), 
+        [param, deployType, this](ServerType *a, ServerType *b) {
+            volatile double k = dailyMaxCPUInPerType[deployType][2] /
+                                dailyMaxMemInPerType[deployType][2];
+            volatile double k1 = a->cpu / a->memory;
+            volatile double k2 = b->cpu / b->memory;
+
+            volatile double absKa = fabs(k1 - k);
+            volatile double absKb = fabs(k2 - k);
+            if (a->category != b->category) {
+                if (a->category == 2) {
+                    return true;
+                }
+                if (b->category == 2) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
+                    int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
+                    int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                    if(aK == bK) {
+                        return a->hardwareCost < b->hardwareCost;
+                    } else {
+                        return aK < bK;
+                    }
+                } else {
+                    return fcmp(absKa - absKb) < 0;
+                }
+            }
+        });
+
+        if(dailyMaxMemInPerType[deployType][4] != 0) 
+        std::sort(machineListForSort[4][1].begin(), machineListForSort[4][1].end(), 
+        [param, deployType, this](ServerType *a, ServerType *b) {
+            volatile double k = dailyMaxCPUInPerType[deployType][4] /
+                                dailyMaxMemInPerType[deployType][4];
+            volatile double k1 = a->cpu / a->memory;
+            volatile double k2 = b->cpu / b->memory;
+
+            volatile double absKa = fabs(k1 - k);
+            volatile double absKb = fabs(k2 - k);
+            if (a->category != b->category) {
+                if (a->category == 4) {
+                    return true;
+                }
+                if (b->category == 4) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
+                    int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
+                    int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                    if(aK == bK) {
+                        return a->hardwareCost < b->hardwareCost;
+                    } else {
+                        return aK < bK;
+                    }
+                } else {
+                    return fcmp(absKa - absKb) < 0;
+                }
+            }
+        });
+
 
         // std::clog << "????????????" << std::endl;
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
+            
             auto vmType = it->first;
             auto query = it->second;
             auto vm = VM::newVM(query->vmID, *vmType);
             vmAddRecord[vm->id] = std::make_pair(isPeak, day);
+            int inPeak = 0;
+            if(isPeak && vmDieInK.find(vm->id) != vmDieInK.end()) {
+                inPeak = 1;
+            }
             canLocateFlag = false;
             if (vm->deployType == VMType::DeployType::DUAL) {
                 Server *minAlivm = nullptr;
-                for (auto top : aliveMachineList[vm->deployType][isPeak]) {
+                for (auto top : aliveMachineList[vm->deployType][inPeak]) {
                     auto aliveM = top.second;
                     if (aliveM->canDeployVM(vm)) {
                         if (!minAlivm || compareAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
@@ -454,7 +572,7 @@ private:
             } else {
                 Server *minAlivm = nullptr;
                 Server::DeployNode lastType = Server::DUAL_NODE;
-                for (auto &top : aliveMachineList[vm->deployType][isPeak]) {
+                for (auto &top : aliveMachineList[vm->deployType][inPeak]) {
                     auto aliveM = top.second;
                     int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
                     int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
@@ -486,7 +604,7 @@ private:
             if (!canLocateFlag) {
                 Server *aliveM = nullptr;
                 bool canSteal = false;
-                for(auto top : aliveMachineList[vm->deployType ^ 1][isPeak]){
+                for(auto top : aliveMachineList[vm->deployType ^ 1][inPeak]){
                     aliveM = top.second;
                     if(!aliveM->empty()) continue;
                     if(aliveM->category != vm->category) continue;
@@ -496,12 +614,12 @@ private:
                         if(!aliveM->canDeployVM(vm)) continue;
                     }
                     canSteal = true;
-                    aliveMachineList[vm->deployType ^ 1][isPeak].erase(aliveMachineList[vm->deployType ^ 1][isPeak].find(top.first));
-                    aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                    aliveMachineList[vm->deployType ^ 1][inPeak].erase(aliveMachineList[vm->deployType ^ 1][inPeak].find(top.first));
+                    aliveMachineList[vm->deployType][inPeak][aliveM->id] = aliveM;
                     break;
                 }
-                if(!canSteal && day > highExpDay) {
-                    for(auto top : aliveMachineList[vm->deployType][isPeak ^ 1]){
+                if(!canSteal && day > highExpDay && inPeak) {
+                    for(auto top : aliveMachineList[vm->deployType][inPeak ^ 1]){
                         aliveM = top.second;
                         if(!aliveM->empty()) continue;
                         if(aliveM->category != vm->category) continue;
@@ -511,12 +629,12 @@ private:
                             if(!aliveM->canDeployVM(vm)) continue;
                         }
                         canSteal = true;
-                        aliveMachineList[vm->deployType][isPeak ^ 1].erase(aliveMachineList[vm->deployType][isPeak ^ 1].find(top.first));
-                        aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                        aliveMachineList[vm->deployType][inPeak ^ 1].erase(aliveMachineList[vm->deployType][inPeak ^ 1].find(top.first));
+                        aliveMachineList[vm->deployType][inPeak][aliveM->id] = aliveM;
                         break;
                     }
                     if(!canSteal) {
-                        for(auto top : aliveMachineList[vm->deployType ^ 1][isPeak ^ 1]){
+                        for(auto top : aliveMachineList[vm->deployType ^ 1][inPeak ^ 1]){
                             aliveM = top.second;
                             if(!aliveM->empty()) continue;
                             if(aliveM->category != vm->category) continue;
@@ -526,22 +644,22 @@ private:
                                 if(!aliveM->canDeployVM(vm)) continue;
                             }
                             canSteal = true;
-                            aliveMachineList[vm->deployType ^ 1][isPeak ^ 1].erase(aliveMachineList[vm->deployType ^ 1][isPeak ^ 1].find(top.first));
-                            aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                            aliveMachineList[vm->deployType ^ 1][inPeak ^ 1].erase(aliveMachineList[vm->deployType ^ 1][inPeak ^ 1].find(top.first));
+                            aliveMachineList[vm->deployType][inPeak][aliveM->id] = aliveM;
                             break;
                         }
                     }
                 }
                 if(!canSteal) {
                     ServerType *m;
-                    for (auto &am : machineListForSort[vm->category]) {
+                    for (auto &am : machineListForSort[vm->category][inPeak]) {
                         if (am->canDeployVM(vm)) {
                             m = am;
                             break;
                         }
                     }
                     aliveM = Server::newServer(*m);
-                    aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                    aliveMachineList[vm->deployType][inPeak][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
                     #ifdef TEST
                         hardwareCost += aliveM->hardwareCost;
