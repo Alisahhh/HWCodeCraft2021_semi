@@ -486,6 +486,38 @@ private:
                     aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
                     break;
                 }
+                if(!canSteal && day > highExpDay) {
+                    for(auto top : aliveMachineList[vm->deployType][isPeak ^ 1]){
+                        aliveM = top.second;
+                        if(!aliveM->empty()) continue;
+                        if(aliveM->category != vm->category) continue;
+                        if(vm->deployType == VMType::SINGLE) {
+                            if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                        } else {
+                            if(!aliveM->canDeployVM(vm)) continue;
+                        }
+                        canSteal = true;
+                        aliveMachineList[vm->deployType][isPeak ^ 1].erase(aliveMachineList[vm->deployType][isPeak ^ 1].find(top.first));
+                        aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                        break;
+                    }
+                    if(!canSteal) {
+                        for(auto top : aliveMachineList[vm->deployType ^ 1][isPeak ^ 1]){
+                            aliveM = top.second;
+                            if(!aliveM->empty()) continue;
+                            if(aliveM->category != vm->category) continue;
+                            if(vm->deployType == VMType::SINGLE) {
+                                if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+                            } else {
+                                if(!aliveM->canDeployVM(vm)) continue;
+                            }
+                            canSteal = true;
+                            aliveMachineList[vm->deployType ^ 1][isPeak ^ 1].erase(aliveMachineList[vm->deployType ^ 1][isPeak ^ 1].find(top.first));
+                            aliveMachineList[vm->deployType][isPeak][aliveM->id] = aliveM;
+                            break;
+                        }
+                    }
+                }
                 if(!canSteal) {
                     ServerType *m;
                     for (auto &am : machineListForSort[vm->category]) {
