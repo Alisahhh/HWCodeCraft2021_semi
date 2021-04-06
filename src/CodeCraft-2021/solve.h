@@ -28,17 +28,20 @@ public:
         commonData = new CommonData(serverTypeList, vmTypeList);
 
 #ifdef TEST_KMEANS
-        auto kMeansStartTime = clock();
-        auto *kMeans = new KMeans;
-        std::vector<std::pair<std::vector<double>, int>> testData;
-        for (int i = 0; i < serverTypeList.size(); i++) {
-            testData.push_back({{(double) serverTypeList[i]->hardwareCost / serverTypeList[i]->energyCost}, i});
+        auto *kMeans = new KMeans<ServerType *>;
+        std::vector<std::pair<std::vector<double>, ServerType *>> testData;
+        for (auto &i : serverTypeList) {
+            testData.push_back({{(double) i->hardwareCost / i->energyCost}, i});
         }
-        auto kMeansEndTime = clock();
-        auto result = kMeans->kMeans(testData);
-        std::clog << "kMeans complete" << std::endl;
-        LOG_TIME(kMeansEndTime - kMeansStartTime)
-        exit(0);
+        auto kMeansResultTmp = kMeans->kMeans(testData, 3);
+        std::vector<std::vector<ServerType *>> kMeansResult;
+        for (auto &i : kMeansResultTmp) {
+            std::vector<ServerType *> tmp;
+            for (auto &obj : i) {
+                tmp.push_back(obj.second);
+            }
+            kMeansResult.push_back(tmp);
+        }
 #endif
 
         machineListForSort = serverTypeList;
