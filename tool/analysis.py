@@ -157,6 +157,8 @@ def get_day_cpu_memory_usage():
     memory_sum = 0
 
     for serv in server_list.values():
+        if serv.vm_count == 0:
+            continue
         cpu_inuse += serv.cpu[0] + serv.cpu[1]
         cpu_sum += serv.cpu_src
         memory_inuse += serv.memory[0] + serv.memory[1]
