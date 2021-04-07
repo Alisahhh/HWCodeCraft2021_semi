@@ -29,17 +29,74 @@ public:
         auto vmTypeList = io->readVMType();
         commonData = new CommonData(serverTypeList, vmTypeList);
 
-        for (int i =0; i< serverTypeList.size();i++){
-            if(serverTypeList[i]->model == "host86WZS"){
-                tmpPMCandy[SAME_LARGE]= serverTypeList[i];
-            }
-            if(serverTypeList[i]->model == "hostL08YG"){
-                tmpPMCandy[MORE_MEMORY]=serverTypeList[i];
-            }
-            if(serverTypeList[i]->model == "hostWI6FQ"){
-                tmpPMCandy[MORE_CPU]=serverTypeList[i];
-            }
+        for (auto it:serverTypeList){
+            if(it->memory <= 400 || it->cpu <= 400)
+                findHighExpPMTypeList[SAME_LARGE].push_back(it);
+            findHighExpPMTypeList[MORE_CPU].push_back(it);
+            findHighExpPMTypeList[MORE_MEMORY].push_back(it);
         }
+
+        int param = SAME_LARGE;
+        std::sort(findHighExpPMTypeList[SAME_LARGE].begin(), findHighExpPMTypeList[SAME_LARGE].end(), [param, this](ServerType *a, ServerType *b) {
+            if (a->category != b->category) {
+                if (a->category == param) {
+                    return true;
+                }
+                if (b->category == param) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                if(aK == bK) {
+                    return fcmp(std::abs(1.0 - (double)a->cpu / (double)a->memory) - std::abs(1.0 - (double)b->cpu / (double)b->memory)) < 0;
+                } else {
+                    return aK < bK;
+                }
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[SAME_LARGE][0]->model.c_str(), findHighExpPMTypeList[SAME_LARGE][1]->model.c_str(), findHighExpPMTypeList[SAME_LARGE][2]->model.c_str());
+#endif
+
+        param = MORE_CPU;
+        std::sort(findHighExpPMTypeList[MORE_CPU].begin(), findHighExpPMTypeList[MORE_CPU].end(), [param, this](ServerType *a, ServerType *b) {
+            if (a->category != b->category) {
+                if (a->category == param) {
+                    return true;
+                }
+                if (b->category == param) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                if(aK == bK) {
+                    return fcmp(std::abs(3.0 - (double)a->cpu / (double)a->memory) - std::abs(3.0 - (double)b->cpu / (double)b->memory)) < 0;
+                } else {
+                    return aK < bK;
+                }
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[MORE_CPU][0]->model.c_str(), findHighExpPMTypeList[MORE_CPU][1]->model.c_str(), findHighExpPMTypeList[MORE_CPU][2]->model.c_str());
+#endif
+
+        param = MORE_MEMORY;
+        std::sort(findHighExpPMTypeList[MORE_MEMORY].begin(), findHighExpPMTypeList[MORE_MEMORY].end(), [param, this](ServerType *a, ServerType *b) {
+            int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+            int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+            if(aK == bK) {
+                return fcmp(std::abs(0.5 - (double)a->cpu / (double)a->memory) - std::abs(0.5 - (double)b->cpu / (double)b->memory)) < 0;
+            } else {
+                return aK < bK;
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[MORE_MEMORY][0]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][1]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][2]->model.c_str());
+#endif
 
 #ifdef TEST_KMEANS
         auto *kMeans = new KMeans<ServerType *>;
@@ -237,6 +294,7 @@ private:
     std::set<int> vmDieInK;
     int vmAliveTimeCnt[10] = {0};
     std::unordered_map<int, ServerType *> tmpPMCandy;
+    std::vector<ServerType *> findHighExpPMTypeList[5];
 
     StdIO *io;
     CommonData *commonData;
@@ -506,16 +564,22 @@ private:
 
                 if(!canSteal) {
                     ServerType *m;
-                    for (auto &am : machineListForSort[vm->category]) {
-                        if (am->canDeployVM(vm)) {
-                            m = am;
-                            break;
-                        }
-                    }
                     if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() > RAND_MAX*0.8){
-                        aliveM = Server::newServer(*tmpPMCandy[vm->category]);
+                        for (auto &am : findHighExpPMTypeList[vm->category]) {
+                            if (am->canDeployVM(vm)) {
+                                m = am;
+                                break;
+                            }
+                        }
+                        aliveM = Server::newServer(*m);
                         aliveM->isHigh = true;
                     }else{
+                        for (auto &am : machineListForSort[vm->category]) {
+                            if (am->canDeployVM(vm)) {
+                                m = am;
+                                break;
+                            }
+                        }
                         aliveM = Server::newServer(*m);
                     }
 
