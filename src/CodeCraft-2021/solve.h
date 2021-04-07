@@ -12,6 +12,7 @@
 #include "io.h"
 #include "migrate.h"
 #include "debug.h"
+#include "util.h"
 
 class Solver {
 public:
@@ -25,6 +26,25 @@ public:
         auto serverTypeList = io->readServerType();
         auto vmTypeList = io->readVMType();
         commonData = new CommonData(serverTypeList, vmTypeList);
+
+#ifdef TEST_KMEANS
+        auto *kMeans = new KMeans<ServerType *>;
+        std::vector<std::pair<std::vector<double>, ServerType *>> testData;
+        for (auto &i : serverTypeList) {
+            testData.push_back({{(double) i->hardwareCost / i->energyCost}, i});
+        }
+        auto kMeansResultTmp = kMeans->kMeans(testData);
+        delete kMeans;
+        std::vector<std::vector<ServerType *>> kMeansResult;
+        for (auto &i : kMeansResultTmp) {
+            std::vector<ServerType *> tmp;
+            for (auto &obj : i) {
+                tmp.push_back(obj.second);
+            }
+            kMeansResult.push_back(tmp);
+        }
+#endif
+
         for(int i = 1;i <= 4;i ++) {
             if(i == 3) continue;
             machineListForSort[i] = serverTypeList;

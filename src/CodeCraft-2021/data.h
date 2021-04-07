@@ -394,10 +394,19 @@ public:
         return server;
     }
 
+    static void removeServer(int id) {
+        auto it = serverMap.find(id);
+        if (it == serverMap.end()) {
+            throw std::logic_error("Server::removeServer: given server id does not match any of the servers");
+        }
+        delete it->second; // 回收内存
+        serverMap.erase(it);
+    }
+
     static Server *getServer(int id) {
         auto it = serverMap.find(id);
         if (it == serverMap.end()) {
-            throw std::logic_error("Server::getServer: given vm id does not match any of the vms");
+            throw std::logic_error("Server::getServer: given server id does not match any of the servers");
         }
         return it->second;
     }
