@@ -1114,27 +1114,28 @@ class Migrator {
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
-                    /*
-                    if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
-                        remainResourceWeightedSum =
-                            getRemainResourceWeightedSum(curPM, vm);
-                        // findCnt++;
-                        // step = 1;
-                        if (remainResourceWeightedSum < curMinimalRemainder) {
+                    if (curPMGroup == 1) {
+                        if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
+                            remainResourceWeightedSum =
+                                getRemainResourceWeightedSum(curPM, vm);
+                            // findCnt++;
+                            // step = 1;
+                            if (remainResourceWeightedSum < curMinimalRemainder) {
+                                targetPMId = curPM->id;
+                                targetType = Server::DUAL_NODE;
+                                position = i;
+                                curMinimalRemainder = remainResourceWeightedSum;
+                                minusCnt++;
+                            }
+                        }
+                    }else{
+                        if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE, ServerType::DUAL_NODE) < 0){
                             targetPMId = curPM->id;
-                            targetType = Server::DUAL_NODE;
+                            targetType = ServerType::DUAL_NODE;
                             position = i;
-                            curMinimalRemainder = remainResourceWeightedSum;
                             minusCnt++;
                         }
                     }
-                    */
-                   if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE, ServerType::DUAL_NODE) < 0){
-                       targetPMId = curPM->id;
-                       targetType = ServerType::DUAL_NODE;
-                       position = i;
-                       minusCnt++;
-                   }
                 }
             }
         } else if (deployType == VMType::SINGLE) {

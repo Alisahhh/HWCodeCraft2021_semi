@@ -93,36 +93,52 @@ public:
                 int limit = VM::getVMCount() * 3 / 100; // 百分之3
                 int emergencyGroupLimit = 0;
                 int commonGroupLimit = 0;
+
+                int emergencyGroupVmCnt = 0;
+                int commonGroupVmCnt = 0;
+
+                for (auto pm:aliveMachineList[0][1]){
+                    emergencyGroupVmCnt+= pm.second->getAllDeployedVMs().size();
+                }
+                for (auto pm:aliveMachineList[1][1]){
+                    emergencyGroupVmCnt+= pm.second->getAllDeployedVMs().size();
+                }
+                for (auto pm:aliveMachineList[0][0]){
+                    commonGroupVmCnt+= pm.second->getAllDeployedVMs().size();
+                }
+                for (auto pm:aliveMachineList[1][0]){
+                    commonGroupVmCnt+= pm.second->getAllDeployedVMs().size();
+                }
+
+
                 fprintf(stderr, "%d %d\n", emergencyGroupDelCnt, commonGroupDelCnt);
-                if (emergencyGroupDelCnt + commonGroupDelCnt == 0){
-                    emergencyGroupLimit = limit * (aliveMachineList[0][1].size() +  aliveMachineList[1][1].size()) / ( aliveMachineList[0][0].size() +  aliveMachineList[1][0].size()+  aliveMachineList[0][1].size()+  aliveMachineList[1][1].size());
-                    emergencyGroupLimit *= 2;
-                    emergencyGroupLimit += lastDayLeftMigCnt;
-                    commonGroupLimit = limit - emergencyGroupLimit;
+                if (true){
+                    emergencyGroupLimit = limit * emergencyGroupVmCnt / (emergencyGroupVmCnt+commonGroupVmCnt);
                 } else {
                     emergencyGroupLimit = limit * emergencyGroupDelCnt / (emergencyGroupDelCnt+commonGroupDelCnt);
-                    emergencyGroupLimit *= 2;
-                    emergencyGroupLimit += lastDayLeftMigCnt;
-                    commonGroupLimit = limit - emergencyGroupLimit;
                 }
+
+                emergencyGroupLimit += lastDayLeftMigCnt;
+                commonGroupLimit = limit - emergencyGroupLimit;
 
                 // handle emergency gourp mig
 #ifdef TEST
                 fprintf(stderr, "emergency group\n");
 #endif
-                // emergencyGroupLimit = INT32_MAX;
-                // commonGroupLimit = INT32_MAX;
+                emergencyGroupLimit = INT32_MAX;
+                commonGroupLimit = INT32_MAX;
 
                 migrator->setCurPMGroup(1);
-                emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.2);
-                emergencyGroupLimit -= migrator->combineLowLoadRatePM(day, emergencyGroupLimit, migrationList);
-                emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.05);
+                //emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.2);
+                //emergencyGroupLimit -= migrator->combineLowLoadRatePM(day, emergencyGroupLimit, migrationList);
+                emergencyGroupLimit -= migrator->migrateScatteredVM(day, emergencyGroupLimit, migrationList, 0.1);
 
                 // handle common group mig
 #ifdef TEST
                 fprintf(stderr, "common group\n");
 #endif
                 migrator->setCurPMGroup(0);
+                commonGroupLimit += emergencyGroupLimit;
                 //commonGroupLimit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 commonGroupLimit -= migrator->migrateScatteredVM(day, commonGroupLimit, migrationList, 0.2);
                 commonGroupLimit -= migrator->combineLowLoadRatePM(day, commonGroupLimit, migrationList);
