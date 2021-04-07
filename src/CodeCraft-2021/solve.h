@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
+#include <stdlib.h>
 
 #include "data.h"
 #include "io.h"
@@ -23,9 +24,16 @@ public:
 
     void solve() {
         // 初始化数据
+        srand(0x111);
         auto serverTypeList = io->readServerType();
         auto vmTypeList = io->readVMType();
         commonData = new CommonData(serverTypeList, vmTypeList);
+
+        for (int i =0; i< serverTypeList.size();i++){
+            if(serverTypeList[i]->model == "host86WZS"){
+                tmpPMCandy = serverTypeList[i];
+            }
+        }
 
 #ifdef TEST_KMEANS
         auto *kMeans = new KMeans<ServerType *>;
@@ -93,7 +101,7 @@ public:
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
                 // limit = INT32_MAX;
-                limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
+                //limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
@@ -210,6 +218,7 @@ private:
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
     int vmAliveTimeCnt[10] = {0};
+    ServerType *tmpPMCandy;
 
     StdIO *io;
     CommonData *commonData;
@@ -485,7 +494,13 @@ private:
                             break;
                         }
                     }
-                    aliveM = Server::newServer(*m);
+                    if (isPeak && rand() > RAND_MAX*0.8){
+                        aliveM = Server::newServer(*tmpPMCandy);
+                        aliveM->isHigh = true;
+                    }else{
+                        aliveM = Server::newServer(*m);
+                    }
+
                     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
                     #ifdef TEST

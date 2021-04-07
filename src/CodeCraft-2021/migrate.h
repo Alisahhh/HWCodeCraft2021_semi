@@ -1108,6 +1108,9 @@ class Migrator {
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
+                    if (curPM->isHigh && !outPM->isHigh){
+                        continue;
+                    }
                     /*
                     if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum =
@@ -1142,6 +1145,9 @@ class Migrator {
                 // avoid startup an empty machine
                 if (curPM->empty())
                     continue;
+                if (curPM->isHigh && !outPM->isHigh){
+                    continue;
+                }
 
                 int remainResourceWeightedSum = INT32_MAX;
 
