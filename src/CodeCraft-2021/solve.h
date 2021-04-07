@@ -72,6 +72,7 @@ public:
             // migration
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
+                // limit = INT32_MAX;
                 limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
@@ -235,10 +236,10 @@ private:
         if(dailyMaxMemInPerType[deployType][1] != 0)
         std::sort(machineListForSort[1].begin(), machineListForSort[1].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
-            volatile double k = dailyMaxCPUInPerType[deployType][1] /
+            volatile double k = (dailyMaxCPUInPerType[deployType][1] + 0.0)/
                                 dailyMaxMemInPerType[deployType][1];
-            volatile double k1 = a->cpu / a->memory;
-            volatile double k2 = b->cpu / b->memory;
+            volatile double k1 = (a->cpu + 0.0) / a->memory;
+            volatile double k2 = (b->cpu + 0.0)/ b->memory;
 
             volatile double absKa = fabs(k1 - k);
             volatile double absKb = fabs(k2 - k);
@@ -251,7 +252,7 @@ private:
                 }
                 return a->category < b->category;
             } else {
-                if (fcmp(absKa - 0.5) < 0 && fcmp(absKb - 0.5) < 0) {
+                if (fcmp(absKa - 10) < 0 && fcmp(absKb - 10) < 0) {
                     if((fcmp(k1 -1) > 0 && fcmp(k2 -1) < 0) || (fcmp(k1 -1) < 0 && fcmp(k2 -1) > 0)) {
                         if(fcmp(k -1) > 0) {
                             if(fcmp(k1 -1) > 0) return true;
@@ -282,10 +283,10 @@ private:
         if(dailyMaxMemInPerType[deployType][2] != 0) 
         std::sort(machineListForSort[2].begin(), machineListForSort[2].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
-            volatile double k = dailyMaxCPUInPerType[deployType][2] /
+            volatile double k = (dailyMaxCPUInPerType[deployType][2] + 0.0)/
                                 dailyMaxMemInPerType[deployType][2];
-            volatile double k1 = a->cpu / a->memory;
-            volatile double k2 = b->cpu / b->memory;
+            volatile double k1 = (a->cpu + 0.0)/ a->memory;
+            volatile double k2 = (b->cpu + 0.0)/ b->memory;
 
             volatile double absKa = fabs(k1 - k);
             volatile double absKb = fabs(k2 - k);
@@ -298,7 +299,7 @@ private:
                 }
                 return a->category < b->category;
             } else {
-                if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
+                if (fcmp(absKa - 20) < 0 && fcmp(absKb - 20) < 0) {
                     if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
@@ -319,10 +320,10 @@ private:
         if(dailyMaxMemInPerType[deployType][4] != 0) 
         std::sort(machineListForSort[4].begin(), machineListForSort[4].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
-            volatile double k = dailyMaxCPUInPerType[deployType][4] /
+            volatile double k = (dailyMaxCPUInPerType[deployType][4] + 0.0)/
                                 dailyMaxMemInPerType[deployType][4];
-            volatile double k1 = a->cpu / a->memory;
-            volatile double k2 = b->cpu / b->memory;
+            volatile double k1 = (a->cpu + 0.0)/ a->memory;
+            volatile double k2 = (b->cpu + 0.0)/ b->memory;
 
             volatile double absKa = fabs(k1 - k);
             volatile double absKb = fabs(k2 - k);
@@ -335,7 +336,7 @@ private:
                 }
                 return a->category < b->category;
             } else {
-                if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
+                if (fcmp(absKa - 1) < 0 && fcmp(absKb - 1) < 0) {
                     if(day > highExpDay) {
                         int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;

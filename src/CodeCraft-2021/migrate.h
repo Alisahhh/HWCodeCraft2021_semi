@@ -832,8 +832,8 @@ class Migrator {
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
     volatile const double MEMORY_PARA = 0.47;
-    volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.4, 0.4, 0.4, 0.4,
-                                                             0.4};
+    volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.55, 0.55, 0.55, 0.55,
+                                                             0.55};
     volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
 
     int emptyPMCnt = 0;
