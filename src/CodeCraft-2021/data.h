@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <cassert>
 
 const double EPS = 1e-12;
 
@@ -156,6 +157,10 @@ public:
 
     friend std::ostream &operator<<(std::ostream &os, const ServerType &serverType) {
         return os << serverType.toString();
+    }
+
+    bool operator == (const ServerType &serverType) {
+        return this->model == serverType.model;
     }
 
     enum DeployNode : int {

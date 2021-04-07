@@ -253,6 +253,22 @@ private:
         volatile double param = 1.6;
         if (isPeak) param = 1.0;
         auto deployType = addQueryList[0].first->deployType;
+        std::vector<Server*>stealMachine;
+        for(auto top : aliveMachineList[deployType ^ 1]){
+            auto aliveM = top.second;
+            if(!aliveM->empty()) continue;
+            // if(aliveM->category != vm->category) continue;
+            stealMachine.push_back(aliveM);
+            // if(vm->deployType == VMType::SINGLE) {
+            //     if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
+            // } else {
+            //     if(!aliveM->canDeployVM(vm)) continue;
+            // }
+            // canSteal = true;
+            // aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
+            // aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+            // break;
+        }
         if(dailyMaxMemInPerType[deployType][1] != 0)
         std::sort(machineListForSort[1].begin(), machineListForSort[1].end(), 
         [param, deployType, this](ServerType *a, ServerType *b) {
@@ -284,8 +300,8 @@ private:
                         }
                     }
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) / 100;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) / 100;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {
@@ -295,6 +311,7 @@ private:
                     return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                 (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                 } else {
+                    // assert(0);
                     return fcmp(absKa - absKb) < 0;
                 }
             }
@@ -321,8 +338,8 @@ private:
             } else {
                 if (fcmp(absKa - 20) < 0 && fcmp(absKb - 20) < 0) {
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) / 100;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) / 100;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {
@@ -332,6 +349,7 @@ private:
                     return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                 (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                 } else {
+                    // assert(0);
                     return fcmp(absKa - absKb) < 0;
                 }
             }
@@ -358,8 +376,8 @@ private:
             } else {
                 if (fcmp(absKa - 1) < 0 && fcmp(absKb - 1) < 0) {
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) / 100;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) / 100;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {
@@ -369,6 +387,7 @@ private:
                     return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
                                 (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                 } else {
+                    // assert(0);
                     return fcmp(absKa - absKb) < 0;
                 }
             }
@@ -435,56 +454,44 @@ private:
             if (!canLocateFlag) {
                 Server *aliveM = nullptr;
                 bool canSteal = false;
-                std::vector<Server*>stealMachine;
-
-                for(auto top : aliveMachineList[vm->deployType ^ 1]){
-                    aliveM = top.second;
-                    if(!aliveM->empty()) continue;
-                    if(aliveM->category != vm->category) continue;
-                    stealMachine.push_back(aliveM);
-                    // if(vm->deployType == VMType::SINGLE) {
-                    //     if(!aliveM->canDeployVM(vm, Server::NODE_0)) continue;
-                    // } else {
-                    //     if(!aliveM->canDeployVM(vm)) continue;
-                    // }
-                    // canSteal = true;
-                    // aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(top.first));
-                    // aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                    // break;
-                }
-                // sort(stealMachine.begin(), stealMachine.end(), [vm, this](ServerType *a, ServerType *b){
-                //     // if (a->category != b->category) {
-                //     //     if(a->category == vm->category) {
-                //     //         return true;
-                //     //     }
-                //     //     if(b->category == vm->category) {
-                //     //         return false;
-                //     //     }
-                //     // }
-                //     return a->energyCost < b->energyCost;
-                // });
-
-                for(auto &server : stealMachine) {
-                    if(vm->deployType == VMType::SINGLE) {
-                        if(!server->canDeployVM(vm, Server::NODE_0)) continue;
-                    } else {
-                        if(!server->canDeployVM(vm)) continue;
+                
+                ServerType *m;
+                for (auto &am : machineListForSort[vm->category]) {
+                    if (am->canDeployVM(vm)) {
+                        m = am;
+                        break;
                     }
-                    canSteal = true;
-                    aliveM = server;
-                    aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
-                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                    break;
                 }
-
+                for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
+                    if(!top.second->empty()) continue;
+                    if(top.second->category != vm->category) continue;
+                    if((*m) == (ServerType)(*top.second)) {
+                        // assert(0);
+                        aliveM = top.second;
+                        aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
+                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                        canSteal = true;
+                        break;
+                    }
+                }
                 if(!canSteal) {
-                    ServerType *m;
-                    for (auto &am : machineListForSort[vm->category]) {
-                        if (am->canDeployVM(vm)) {
-                            m = am;
-                            break;
+                    for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
+                        if(!top.second->empty()) continue;
+                        if(top.second->category != vm->category) continue;
+                        if(vm->deployType == VMType::SINGLE) {
+                            if(!top.second->canDeployVM(vm, Server::NODE_0)) continue;
+                        } else {
+                            if(!top.second->canDeployVM(vm)) continue;
                         }
+                        
+                        aliveM = top.second;
+                        aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
+                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                        canSteal = true;
+                        break;
                     }
+                }
+                if(!canSteal) {
                     aliveM = Server::newServer(*m);
                     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
