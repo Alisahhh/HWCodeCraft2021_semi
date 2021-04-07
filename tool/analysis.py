@@ -1,4 +1,5 @@
 import sys
+import copy
 
 
 class VM:
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     N = int(in_f.readline().strip())
     for i in range(N):
         line = in_f.readline()
-        line = line[1:-1]
+        line = line[1:-2]
         obj = line.split(',')
 
         model = obj[0].strip()
@@ -76,7 +77,7 @@ if __name__ == '__main__':
         memory = int(obj[2].strip())
         hardware_cost = int(obj[3].strip())
         energy_cost = int(obj[4].strip())
-        server = Server(model, cpu, memory, hardware_cost, energy_cost)
+        server = Server(0, model, cpu, memory, hardware_cost, energy_cost)
 
         server_type_list[model] = server
     
@@ -84,14 +85,14 @@ if __name__ == '__main__':
     M = int(in_f.readline().strip())
     for i in range(M):
         line = in_f.readline()
-        line = line[1:-1]
+        line = line[1:-2]
         obj = line.split(',')
 
         model = obj[0].strip()
         cpu = int(obj[1].strip())
         memory = int(obj[2].strip())
         dual = int(obj[3].strip())
-        vm = VM(model, cpu, memory, bool(dual))
+        vm = VM(0, model, cpu, memory, bool(dual))
 
         vm_type_list[model] = vm
     
@@ -107,33 +108,36 @@ if __name__ == '__main__':
         line = ans_f.readline()
         if len(line) == 0:
             break
-        line = line[1:-1]
+        line = line[1:-2]
         obj = line.split(',')
         
         # 购买
         Q = int(obj[1].strip())
         for i in range(Q):
             line = ans_f.readline()
-            line = line[1:-1]
+            line = line[1:-2]
             obj = line.split(',')
 
             model = obj[0].strip()
             count = int(obj[1].strip())
+
             for i in range(count):
-                server: Server = server_type_list[model]
+                server: Server = copy.copy(server_type_list[model])
                 server.id = server_id_count
                 server_id_count += 1
                 server_list[server.id] = server
 
+                hardware_cost += server.hardware_cost
+
         line = ans_f.readline()
-        line = line[1:-1]
+        line = line[1:-2]
         obj = line.split(',')
         
         # 迁移
         W = int(obj[1].strip())
         for i in range(W):
             line = ans_f.readline()
-            line = line[1:-1]
+            line = line[1:-2]
             obj = line.split(',')
 
             vm_id = int(obj[0].strip())
@@ -159,13 +163,57 @@ if __name__ == '__main__':
         R = int(in_f.readline().strip())
         for i in range(R):
             line = in_f.readline()
-            line = line[1:-1]
+            line = line[1:-2]
             obj = line.split(',')
 
+            model = ""
+            vm_id = -1
             if obj[0].strip() == 'add':
-                
+                model = obj[1].strip()
+                vm_id = int(obj[2].strip())
             else:
+                vm_id = int(obj[1].strip())
+            
+            if obj[0].strip() == 'add':
+                line = ans_f.readline()
+                line = line[1:-2]
+                obj = line.split(',')
+                
+                vm: VM = copy.copy(vm_type_list[model])
+                vm.id = vm_id
+                vm_list[vm_id] = vm
 
+                server_id = int(obj[0].strip())
+                node = 2
+                if not vm.dual:
+                    node_char = obj[1].strip()
+                    if node_char == 'A':
+                        node = 0
+                    else:
+                        node = 1
+
+                server: Server = server_list[server_id]
+                server.deploy(vm, node)
+                server_list[server_id] = server
+            else:
+                vm = vm_list[vm_id]
+                server_id = Server.vm_dict[vm_id][0]
+                server: Server = server_list[server_id]
+                server.remove(vm)
+                server_list[server_id] = server
+                del vm_list[vm_id]
+
+        for serv in server_list.values():
+            if serv.vm_count > 0:
+                energy_cost += serv.energy_cost
+            
+        hardware_cost_sum += hardware_cost
+        energy_cost_sum += energy_cost
+
+        print('day %d hardware_cost %d energy_cost %d'%(day, hardware_cost, energy_cost))
+    
+    print('overall cost %d hardware_cost %d'%(hardware_cost_sum + energy_cost_sum, hardware_cost_sum))
+            
 
 
 
