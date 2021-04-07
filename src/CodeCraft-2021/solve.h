@@ -31,7 +31,13 @@ public:
 
         for (int i =0; i< serverTypeList.size();i++){
             if(serverTypeList[i]->model == "host86WZS"){
-                tmpPMCandy = serverTypeList[i];
+                tmpPMCandy[SAME_LARGE]= serverTypeList[i];
+            }
+            if(serverTypeList[i]->model == "hostL08YG"){
+                tmpPMCandy[MORE_MEMORY]=serverTypeList[i];
+            }
+            if(serverTypeList[i]->model == "hostWI6FQ"){
+                tmpPMCandy[MORE_CPU]=serverTypeList[i];
             }
         }
 
@@ -69,13 +75,13 @@ public:
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
-        /*queryListK.resize(K);
+        queryListK.resize(K);
         for (int i = 1; i <= K; i++) {
 #ifdef TEST
             std::clog << "READ DAY " << i << ", STORED IN " << i % K << std::endl;
 #endif
             queryListK[i % K] = io->readDayQueries();
-        }*/
+        }
         time_t startTime, endTime, timeSum = 0; // DEBUG USE
         time_t migTimeSum = 0; // DEBUG USE
         startTime = clock(); // DEBUG USE
@@ -112,13 +118,23 @@ public:
 #ifdef TEST
             checkUsedRate();
 #endif
-            //auto queryList = queryListK[day % K];
-            auto queryList = io->readDayQueries();
+            auto queryList = queryListK[day % K];
+            //auto queryList = io->readDayQueries();
             calcDailyResource(queryList);
-            /*if (day != 1 && day + K - 1 <= T) {
+            if (day != 1 && day + K - 1 <= T) {
+#ifdef TEST
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
+#endif
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
-            }*/
+            }
+
+            vmDieInK.clear();
+            vmAddRecordInK.clear();
+
+            for(int i=0;i<K;i++){
+                calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
+            }
+
             std::vector<std::pair<VMType *, Query *>> addQueryLists[2];
             bool flagAddQueriesEmpty = true;
             for (const auto &query : queryList) {
@@ -217,8 +233,10 @@ private:
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
+    std::unordered_map<int, int> vmAddRecordInK;
+    std::set<int> vmDieInK;
     int vmAliveTimeCnt[10] = {0};
-    ServerType *tmpPMCandy;
+    std::unordered_map<int, ServerType *> tmpPMCandy;
 
     StdIO *io;
     CommonData *commonData;
@@ -494,8 +512,8 @@ private:
                             break;
                         }
                     }
-                    if (isPeak && rand() > RAND_MAX*0.8){
-                        aliveM = Server::newServer(*tmpPMCandy);
+                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() > RAND_MAX*0.8){
+                        aliveM = Server::newServer(*tmpPMCandy[vm->category]);
                         aliveM->isHigh = true;
                     }else{
                         aliveM = Server::newServer(*m);
@@ -565,6 +583,18 @@ private:
             dailyMaxMemInPerType[vm->deployType][vm->category] = std::max(
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
+        }
+    }
+
+    void calcVmAliveDays(const std::vector<Query *> &queryList, int K, int day){
+        for (auto &query : queryList) {
+            if (query->type == Query::DEL) {
+                if (vmAddRecordInK.find(query->vmID) != vmAddRecordInK.end()) {
+                    vmDieInK.insert(query->vmID);
+                }
+            } else {
+                vmAddRecordInK[query->vmID] = day;
+            }
         }
     }
 
