@@ -355,7 +355,7 @@ def make_picture():
     model_data = []
     model_cnt_data = []
     for model, cnt in server_model_cnt.items():
-        model_data.append(model)
+        model_data.append(model + ' (%d, %d)'%(server_type_list[model].cpu_src, server_type_list[model].memory_src))
         model_cnt_data.append(cnt)
     axs[3].pie(model_cnt_data, labels=model_data, autopct='%1.1f%%')
     axs[3].set_title('server_model_cnt')
