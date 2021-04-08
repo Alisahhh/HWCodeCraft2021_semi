@@ -128,6 +128,10 @@ public:
     static int getVMCount() {
         return vmMap.size();
     }
+
+    static std::unordered_map<int, VM *> const *getVMMap() {
+        return &vmMap;
+    }
 };
 
 // 服务器参数
@@ -443,7 +447,7 @@ public:
 // Server 的影子对象
 class ServerShadow : public Server {
 public:
-    ServerShadow(Server *_src, std::unordered_map<int, std::pair<int, Server::DeployNode>> *_vmDeployMap) :
+    ServerShadow(Server *_src, ServerShadowFactory *_factory) :
             src(_src), vmDeployMap(_vmDeployMap), Server(*_src) {}
 
     void deploy(VM *vm, DeployNode node) override {
@@ -507,6 +511,7 @@ private:
     friend class ServerShadowFactory;
 
     const Server *src;
+    const ServerShadowFactory *factory;
     std::unordered_map<int, std::pair<int, Server::DeployNode>> *const vmDeployMap;
 
     void reset() {
@@ -561,9 +566,16 @@ public:
         vmDeployMap = Server::vmDeployMap;
     }
 
+    ServerShadowFactory(const ServerShadowFactory &_factory) {
+        vmDeployMap = _factory.vmDeployMap;
+        for (auto[id, _shadow] : _factory.shadowMap) {
+            shadowMap[id] = new ServerShadow(_shadow, this);
+        }
+    }
+
     ServerShadow *getServerShadow(Server *src) {
         if (shadowMap.find(src->id) == shadowMap.end()) {
-            shadowMap[src->id] = new ServerShadow(src, &vmDeployMap);
+            shadowMap[src->id] = new ServerShadow(src, this);
         }
         return shadowMap[src->id];
     }
