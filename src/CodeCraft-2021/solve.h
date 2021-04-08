@@ -198,6 +198,8 @@ public:
 
         std::clog << "Total Cost: " << totalCost << std::endl;
         std::clog << "HardWare Cost: " << hardwareCost << std::endl;
+        std::clog << "TestCnt: " << testCnt << std::endl;
+        std::clog << "TestCnt1: " << testCnt1 << std::endl;
 #endif
     }
 
@@ -207,6 +209,8 @@ private:
     bool isPeak = false;
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
+    int testCnt = 0;
+    int testCnt1 = 0;
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
     int vmAliveTimeCnt[10] = {0};
@@ -217,15 +221,27 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
-    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
+    static constexpr double COMPARE_ADD_QUERY_RATIO =  1 / 2.2;
 
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
     static constexpr int PEAK_MEM = 30000;
-
-
+    
+    // 
+    static constexpr int MIN_MACHINE = 0;
+    static constexpr int MIN_RESOURCE = 0;
+    static constexpr int MAX_RESOURCE = 20;
     static bool compareAddQuery(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
         auto vmA = a.first, vmB = b.first;
+        if(fcmp(vmA->cpu + vmA->memory  * 0.45 - MIN_MACHINE) < 0 && fcmp(vmB->cpu + vmB->memory * 0.45 - MIN_MACHINE) < 0) {
+            return vmA->category < vmB->category;
+        } 
+        if(fcmp(vmA->cpu + vmA->memory  * 0.45 - MIN_MACHINE) < 0) {
+            return false;
+        }
+        if(fcmp(vmB->cpu + vmB->memory * 0.45 - MIN_MACHINE) < 0) {
+            return true;
+        }
         if (vmA->category != vmB->category) {
             return vmA->category < vmB->category;
         }
@@ -392,11 +408,12 @@ private:
                 }
             }
         });
-
-        for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
+        auto it = addQueryList.begin();
+        for (it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
             auto vm = VM::newVM(query->vmID, *vmType);
+            if(fcmp(vm->cpu + vm->memory * 0.45 - MIN_MACHINE) < 0) break;
             canLocateFlag = false;
             if (vm->deployType == VMType::DeployType::DUAL) {
                 Server *minAlivm = nullptr;
@@ -462,18 +479,22 @@ private:
                         break;
                     }
                 }
-                for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
-                    if(!top.second->empty()) continue;
-                    if(top.second->category != vm->category) continue;
-                    if((*m) == (ServerType)(*top.second)) {
-                        // assert(0);
-                        aliveM = top.second;
-                        aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
-                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
-                        canSteal = true;
-                        break;
-                    }
-                }
+
+                // if(day < highExpDay && vm->deployType == VMType::DUAL){ 
+
+                //     for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
+                //         if(!top.second->empty()) continue;
+                //         if(top.second->category != vm->category) continue;
+                //         if((*m) == (ServerType)(*top.second)) {
+                //             // assert(0);
+                //             aliveM = top.second;
+                //             aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
+                //             aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //             canSteal = true;
+                //             break;
+                //         }
+                //     }
+                // }
                 if(!canSteal) {
                     for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
                         if(!top.second->empty()) continue;
@@ -488,6 +509,141 @@ private:
                         aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
                         aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                         canSteal = true;
+                        // std:: clog << *aliveM << std::endl;
+                        break;
+                    }
+                }
+                if(!canSteal) {
+                    aliveM = Server::newServer(*m);
+                    aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                    purchaseList.push_back(aliveM);
+                    #ifdef TEST
+                        hardwareCost += aliveM->hardwareCost;
+                        totalCost += aliveM->hardwareCost;
+                    #endif
+                }
+                if (vm->deployType == VMType::DUAL) {
+                    if (aliveM->canDeployVM(vm)) {
+                        aliveM->deploy(vm);
+                        canLocateFlag = true;
+                    }
+                } else {
+                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                    if (flagA) {
+                        aliveM->deploy(vm, Server::NODE_0);
+                        canLocateFlag = true;
+                    } else if (flagB) {
+                        aliveM->deploy(vm, Server::NODE_1);
+                        canLocateFlag = true;
+                    }
+                }
+            }
+        }
+
+        for (; it != addQueryList.end(); it++) {
+            testCnt ++;
+            auto vmType = it->first;
+            auto query = it->second;
+            auto vm = VM::newVM(query->vmID, *vmType);
+            // std::clog << *vm << std::endl;
+            canLocateFlag = false;
+            if (vm->deployType == VMType::DeployType::DUAL) {
+                Server *minAlivm = nullptr;
+                for (auto top : aliveMachineList[vm->deployType]) {
+                    auto aliveM = top.second;
+                    if (aliveM->canDeployVM(vm)) {
+                        if (!minAlivm || compareSmallAliveM(aliveM, minAlivm, vm, Server::DUAL_NODE) < 0) {
+                            minAlivm = aliveM;
+                        }
+                        canLocateFlag = true;
+                    }
+
+                }
+
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, Server::DUAL_NODE);
+                }
+
+            } else {
+                Server *minAlivm = nullptr;
+                Server::DeployNode lastType = Server::DUAL_NODE;
+                for (auto &top : aliveMachineList[vm->deployType]) {
+                    auto aliveM = top.second;
+                    int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
+                    int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
+                    if (flagA) {
+                        if (!minAlivm || compareSmallAliveM(aliveM, minAlivm, vm, Server::NODE_0, lastType) < 0) {
+                            minAlivm = aliveM;
+                            lastType = Server::NODE_0;
+                        }
+                        canLocateFlag = true;
+                    }
+                    if (flagB) {
+                        if (!minAlivm || compareSmallAliveM(aliveM, minAlivm, vm, Server::NODE_1, lastType) < 0) {
+                            minAlivm = aliveM;
+                            lastType = Server::NODE_1;
+                        }
+                        canLocateFlag = true;
+                    }
+                }
+                if (canLocateFlag) {
+#ifdef DEBUG_O3
+//                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
+//                    std::clog << minAlivm->toString() << std::endl;
+#endif
+                    minAlivm->deploy(vm, lastType);
+                }
+            }
+
+
+            if (!canLocateFlag) {
+                testCnt1++;
+                Server *aliveM = nullptr;
+                bool canSteal = false;
+                
+                ServerType *m;
+                for (auto &am : machineListForSort[vm->category]) {
+                    if (am->canDeployVM(vm)) {
+                        m = am;
+                        break;
+                    }
+                }
+
+                // if(day < highExpDay && vm->deployType == VMType::DUAL){ 
+
+                //     for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
+                //         if(!top.second->empty()) continue;
+                //         if(top.second->category != vm->category) continue;
+                //         if((*m) == (ServerType)(*top.second)) {
+                //             // assert(0);
+                //             aliveM = top.second;
+                //             aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
+                //             aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                //             canSteal = true;
+                //             break;
+                //         }
+                //     }
+                // }
+                if(!canSteal) {
+                    for(auto &top : aliveMachineList[vm->deployType ^ 1]) {
+                        if(!top.second->empty()) continue;
+                        if(top.second->category != vm->category) continue;
+                        if(vm->deployType == VMType::SINGLE) {
+                            if(!top.second->canDeployVM(vm, Server::NODE_0)) continue;
+                        } else {
+                            if(!top.second->canDeployVM(vm)) continue;
+                        }
+                        
+                        aliveM = top.second;
+                        aliveMachineList[vm->deployType ^ 1].erase(aliveMachineList[vm->deployType ^ 1].find(aliveM->id));
+                        aliveMachineList[vm->deployType][aliveM->id] = aliveM;
+                        canSteal = true;
+                        // std:: clog << *aliveM << std::endl;
                         break;
                     }
                 }
@@ -636,6 +792,123 @@ private:
             }
             if (lastNode->energyCost > nowNode->energyCost) {
                 return -1;
+            }
+        }
+
+        if (deployNode == Server::DeployNode::DUAL_NODE) {
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) <= 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) <= 0) {
+                return -1;
+            }
+            if (fcmp(nowNode->getLeftCPU(Server::NODE_0) - lastNode->getLeftCPU(Server::NODE_0)) > 0 &&
+                fcmp(nowNode->getLeftMemory(Server::NODE_0) - lastNode->getLeftMemory(Server::NODE_0)) > 0) {
+                return 1;
+            }
+            int flagNow = 0;
+            int flagLast = 0;
+            if(nowNode->getLeftCPU(Server::NODE_0) - vm->cpu > MAX_RESOURCE && nowNode->getLeftMemory(Server::NODE_0) - vm->memory < MIN_RESOURCE) {
+                flagNow = 1;
+            }
+            if(nowNode->getLeftCPU(Server::NODE_0) - vm->cpu < MIN_RESOURCE && nowNode->getLeftMemory(Server::NODE_0) - vm->memory < MAX_RESOURCE) {
+                flagNow = 1;
+            }
+            if(lastNode->getLeftCPU(Server::NODE_0) - vm->cpu > MAX_RESOURCE && lastNode->getLeftMemory(Server::NODE_0) - vm->memory < MIN_RESOURCE) {
+                flagLast = 1;
+            }
+            if(lastNode->getLeftCPU(Server::NODE_0) - vm->cpu < MIN_RESOURCE && lastNode->getLeftMemory(Server::NODE_0) - vm->memory < MAX_RESOURCE) {
+                flagLast = 1;
+            }
+            if(flagLast ^ flagNow) {
+                if(flagLast) return -1;
+                if(flagNow) return 1;
+            }
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowNode->getLeftCPU(Server::NODE_0) + nowNode->getLeftMemory(Server::NODE_0) * k) -
+                     (lastNode->getLeftCPU(Server::NODE_0) + lastNode->getLeftMemory(Server::NODE_0) * k)) <= 0) {
+                return -1;
+            }
+            return 1;
+        } else {
+            int nowCPU, nowMem, lastCPU, lastMem;
+            if (deployNode == Server::NODE_0) {
+                nowCPU = nowNode->getLeftCPU(Server::NODE_0);
+                nowMem = nowNode->getLeftMemory(Server::NODE_0);
+            } else {
+                nowCPU = nowNode->getLeftCPU(Server::NODE_1);
+                nowMem = nowNode->getLeftMemory(Server::NODE_1);
+            }
+            if (lastDeployNode == Server::NODE_0) {
+                lastCPU = lastNode->getLeftCPU(Server::NODE_0);
+                lastMem = lastNode->getLeftMemory(Server::NODE_0);
+            } else {
+                lastCPU = lastNode->getLeftCPU(Server::NODE_1);
+                lastMem = lastNode->getLeftMemory(Server::NODE_1);
+            }
+            if (nowCPU <= lastCPU && nowMem <= lastMem) {
+                return -1;
+            }
+            if (nowCPU > lastCPU && nowMem > lastMem) {
+                return 1;
+            }
+            int flagNow = 0;
+            int flagLast = 0;
+            if(nowCPU - vm->cpu > MAX_RESOURCE && nowMem - vm->memory < MIN_RESOURCE) {
+                flagNow = 1;
+            }
+            if(nowCPU - vm->cpu < MIN_RESOURCE && nowMem - vm->memory < MAX_RESOURCE) {
+                flagNow = 1;
+            }
+            if(nowCPU - vm->cpu > MAX_RESOURCE && nowMem - vm->memory < MIN_RESOURCE) {
+                flagLast = 1;
+            }
+            if(nowCPU - vm->cpu < MIN_RESOURCE && nowMem - vm->memory < MAX_RESOURCE) {
+                flagLast = 1;
+            }
+            if(flagLast ^ flagNow) {
+                if(flagLast) return -1;
+                if(flagNow) return 1;
+            }
+            volatile double k = (double) vm->cpu / vm->memory;
+            if (fcmp((nowCPU + nowMem * k) - (lastCPU + lastMem * k)) <= 0) {
+                return -1;
+            }
+            return 1;
+        }
+    }
+
+    int compareSmallAliveM(Server *nowNode, Server *lastNode, VM *vm, Server::DeployNode deployNode,
+                            Server::DeployNode lastDeployNode = Server::NODE_0) {
+        if (lastNode->empty() != nowNode->empty()) {
+            if (nowNode->empty()) return 1;
+            if (lastNode->empty()) return -1;
+        }
+
+        if (lastNode->empty() && nowNode->empty()) {
+            if (lastNode->energyCost < nowNode->energyCost) {
+                return 1;
+            }
+            if (lastNode->energyCost > nowNode->energyCost) {
+                return -1;
+            }
+        }
+        if (nowNode->getCategory(deployNode) != lastNode->getCategory(lastDeployNode)) {
+            if (nowNode->getCategory(deployNode) == vm->category) {
+                return -1;
+            }
+            if (lastNode->getCategory(lastDeployNode) == vm->category) {
+                return 1;
+            }
+            if (vm->category == Category::MORE_CPU && lastNode->getCategory(lastDeployNode) == Category::MORE_MEMORY) {
+                return -1;
+            }
+            if (vm->category == Category::MORE_CPU && nowNode->getCategory(deployNode) == Category::MORE_MEMORY) {
+                return 1;
+            }
+            if (vm->category == Category::MORE_MEMORY && lastNode->getCategory(lastDeployNode) == Category::MORE_CPU) {
+                return -1;
+            }
+            if (vm->category == Category::MORE_MEMORY && nowNode->getCategory(deployNode) == Category::MORE_CPU) {
+                return 1;
             }
         }
 
