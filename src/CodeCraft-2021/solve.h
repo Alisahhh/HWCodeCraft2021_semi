@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
+#include <stdlib.h>
 
 #include "data.h"
 #include "io.h"
@@ -23,9 +24,79 @@ public:
 
     void solve() {
         // 初始化数据
+        srand(0x111);
         auto serverTypeList = io->readServerType();
         auto vmTypeList = io->readVMType();
         commonData = new CommonData(serverTypeList, vmTypeList);
+
+        for (auto it:serverTypeList){
+            if(it->memory <= 400 || it->cpu <= 400)
+                findHighExpPMTypeList[SAME_LARGE].push_back(it);
+            findHighExpPMTypeList[MORE_CPU].push_back(it);
+            findHighExpPMTypeList[MORE_MEMORY].push_back(it);
+        }
+
+        int param = SAME_LARGE;
+        std::sort(findHighExpPMTypeList[SAME_LARGE].begin(), findHighExpPMTypeList[SAME_LARGE].end(), [param, this](ServerType *a, ServerType *b) {
+            if (a->category != b->category) {
+                if (a->category == param) {
+                    return true;
+                }
+                if (b->category == param) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                if(aK == bK) {
+                    return fcmp(std::abs(1.0 - (double)a->cpu / (double)a->memory) - std::abs(1.0 - (double)b->cpu / (double)b->memory)) < 0;
+                } else {
+                    return aK < bK;
+                }
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[SAME_LARGE][0]->model.c_str(), findHighExpPMTypeList[SAME_LARGE][1]->model.c_str(), findHighExpPMTypeList[SAME_LARGE][2]->model.c_str());
+#endif
+
+        param = MORE_CPU;
+        std::sort(findHighExpPMTypeList[MORE_CPU].begin(), findHighExpPMTypeList[MORE_CPU].end(), [param, this](ServerType *a, ServerType *b) {
+            if (a->category != b->category) {
+                if (a->category == param) {
+                    return true;
+                }
+                if (b->category == param) {
+                    return false;
+                }
+                return a->category < b->category;
+            } else {
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                if(aK == bK) {
+                    return fcmp(std::abs(3.0 - (double)a->cpu / (double)a->memory) - std::abs(3.0 - (double)b->cpu / (double)b->memory)) < 0;
+                } else {
+                    return aK < bK;
+                }
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[MORE_CPU][0]->model.c_str(), findHighExpPMTypeList[MORE_CPU][1]->model.c_str(), findHighExpPMTypeList[MORE_CPU][2]->model.c_str());
+#endif
+
+        param = MORE_MEMORY;
+        std::sort(findHighExpPMTypeList[MORE_MEMORY].begin(), findHighExpPMTypeList[MORE_MEMORY].end(), [param, this](ServerType *a, ServerType *b) {
+            int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
+            int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+            if(aK == bK) {
+                return fcmp(std::abs(0.5 - (double)a->cpu / (double)a->memory) - std::abs(0.5 - (double)b->cpu / (double)b->memory)) < 0;
+            } else {
+                return aK < bK;
+            }
+        });
+#ifdef TEST
+        fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[MORE_MEMORY][0]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][1]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][2]->model.c_str());
+#endif
 
 #ifdef TEST_KMEANS
         auto *kMeans = new KMeans<ServerType *>;
@@ -61,13 +132,13 @@ public:
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
-        /*queryListK.resize(K);
+        queryListK.resize(K);
         for (int i = 1; i <= K; i++) {
 #ifdef TEST
             std::clog << "READ DAY " << i << ", STORED IN " << i % K << std::endl;
 #endif
             queryListK[i % K] = io->readDayQueries();
-        }*/
+        }
         time_t startTime, endTime, timeSum = 0; // DEBUG USE
         time_t migTimeSum = 0; // DEBUG USE
         startTime = clock(); // DEBUG USE
@@ -93,7 +164,7 @@ public:
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
                 // limit = INT32_MAX;
-                limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
+                //limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
@@ -104,13 +175,23 @@ public:
 #ifdef TEST
             checkUsedRate();
 #endif
-            //auto queryList = queryListK[day % K];
-            auto queryList = io->readDayQueries();
+            auto queryList = queryListK[day % K];
+            //auto queryList = io->readDayQueries();
             calcDailyResource(queryList);
-            /*if (day != 1 && day + K - 1 <= T) {
+            if (day != 1 && day + K - 1 <= T) {
+#ifdef TEST
                 std::clog << "Day " << day << " read day " << day + K - 1 << std::endl;
+#endif
                 queryListK[(day + K - 1) % K] = io->readDayQueries();
-            }*/
+            }
+
+            vmDieInK.clear();
+            vmAddRecordInK.clear();
+
+            for(int i=0;i<K;i++){
+                calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
+            }
+
             std::vector<std::pair<VMType *, Query *>> addQueryLists[2];
             bool flagAddQueriesEmpty = true;
             for (const auto &query : queryList) {
@@ -209,7 +290,11 @@ private:
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
+    std::unordered_map<int, int> vmAddRecordInK;
+    std::set<int> vmDieInK;
     int vmAliveTimeCnt[10] = {0};
+    std::unordered_map<int, ServerType *> tmpPMCandy;
+    std::vector<ServerType *> findHighExpPMTypeList[5];
 
     StdIO *io;
     CommonData *commonData;
@@ -479,13 +564,26 @@ private:
 
                 if(!canSteal) {
                     ServerType *m;
-                    for (auto &am : machineListForSort[vm->category]) {
-                        if (am->canDeployVM(vm)) {
-                            m = am;
-                            break;
+                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() < RAND_MAX*0.2){
+                        for (auto &am : findHighExpPMTypeList[vm->category]) {
+                            if (am->canDeployVM(vm)) {
+                                m = am;
+                                break;
+                            }
                         }
+                        aliveM = Server::newServer(*m);
+                        aliveM->isHigh = true;
+                    }else{
+                        for (auto &am : machineListForSort[vm->category]) {
+                            //if (am->cpu > 400 && am->memory > 400) continue;
+                            if (am->canDeployVM(vm)) {
+                                m = am;
+                                break;
+                            }
+                        }
+                        aliveM = Server::newServer(*m);
                     }
-                    aliveM = Server::newServer(*m);
+
                     aliveMachineList[vm->deployType][aliveM->id] = aliveM;
                     purchaseList.push_back(aliveM);
                     #ifdef TEST
@@ -550,6 +648,18 @@ private:
             dailyMaxMemInPerType[vm->deployType][vm->category] = std::max(
                     dailyMaxMemInPerType[vm->deployType][vm->category],
                     nowMem[vm->deployType][vm->category]);
+        }
+    }
+
+    void calcVmAliveDays(const std::vector<Query *> &queryList, int K, int day){
+        for (auto &query : queryList) {
+            if (query->type == Query::DEL) {
+                if (vmAddRecordInK.find(query->vmID) != vmAddRecordInK.end()) {
+                    vmDieInK.insert(query->vmID);
+                }
+            } else {
+                vmAddRecordInK[query->vmID] = day;
+            }
         }
     }
 
@@ -678,35 +788,66 @@ private:
     }
 
     void checkUsedRate() {
-        int resourceTotalCPU[2] = {};
-        int resourceTotalMem[2] = {};
-        int resourceEmptyCPU[2] = {};
-        int resourceEmptyMem[2] = {};
-        int emptyMachine[2] = {};
+        int resourceTotalCPU[2] = {0};
+        int resourceTotalMem[2] = {0};
+        int resourceEmptyCPU[2] = {0};
+        int resourceEmptyMem[2] = {0};
+        int emptyMachine[2] = {0};
+
+        int hresourceTotalCPU[2] = {0};
+        int hresourceTotalMem[2] = {0};
+        int hresourceEmptyCPU[2] = {0};
+        int hresourceEmptyMem[2] = {0};
+        int hemptyMachine[2] = {0};
+        int htotalMachine[2] = {0};
+
         for (int i = 0; i < 2; i++) {
             for (auto &aliveM : aliveMachineList[i]) {
+                if(aliveM.second->isHigh) {
+                    htotalMachine[i]++;
+                }
                 if (aliveM.second->empty()) {
                     emptyMachine[i]++;
+                    if(aliveM.second->isHigh){
+                        hemptyMachine[i]++;
+                    }
                     continue;
                 }
-                // if(aliveM.second.empty()) continue;
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
-                resourceTotalCPU[i] += aliveM.second->cpu;
-                resourceTotalMem[i] += aliveM.second->memory;
+
+                if (aliveM.second->isHigh){
+                    hresourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                    hresourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                    hresourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                    hresourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                    hresourceTotalCPU[i] += aliveM.second->cpu;
+                    hresourceTotalMem[i] += aliveM.second->memory;
+                }else{
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                    resourceTotalCPU[i] += aliveM.second->cpu;
+                    resourceTotalMem[i] += aliveM.second->memory;
+                }
 
             }
         }
         for (int i = 0; i < 2; i++) {
             volatile double cpuEmptyRate = 0;
             volatile double memEmptyRate = 0;
+            volatile double hcpuEmptyRate = 0;
+            volatile double hmemEmptyRate = 0;
 
             if (resourceTotalCPU[i])
                 cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
             if (resourceTotalMem[i])
                 memEmptyRate = (resourceEmptyMem[i] + 0.0) / resourceTotalMem[i];
+
+            if (hresourceTotalCPU[i])
+                hcpuEmptyRate = (hresourceEmptyCPU[i] + 0.0) / hresourceTotalCPU[i];
+            if (hresourceTotalMem[i])
+                hmemEmptyRate = (hresourceEmptyMem[i] + 0.0) / hresourceTotalMem[i];
+
 
             int cpuLowCnt = 0;
             int cpuHighCnt = 0;
@@ -753,6 +894,7 @@ private:
                       << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
                       << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
                       << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+            std::clog << hcpuEmptyRate << ", " << hmemEmptyRate << ", " << htotalMachine[i] << ", " << hemptyMachine[i] << std::endl;
         }
 
         fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);
