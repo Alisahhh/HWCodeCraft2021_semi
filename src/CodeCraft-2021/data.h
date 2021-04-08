@@ -197,6 +197,8 @@ class Server : public ServerType {
 public:
     const int id;
 
+    bool isHigh = false;
+
     std::vector<std::pair<VM *, DeployNode>> getAllDeployedVMs() const {
         std::vector<std::pair<VM *, DeployNode>> vms;
         vms.reserve(deployedVMs.size());
