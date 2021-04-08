@@ -128,7 +128,7 @@ public:
         auto dayCount = io->readDayCount();
         T = dayCount.first;
         // 预先读进来K天
-        int K = dayCount.second;
+        K = dayCount.second;
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
@@ -188,7 +188,9 @@ public:
             vmDieInK.clear();
             vmAddRecordInK.clear();
 
-            for(int i=0;i<K;i++){
+            const int kBest = 15;
+
+            for(int i=0; i<std::min(K, kBest); i++){
                 calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
             }
 
@@ -285,6 +287,7 @@ public:
 private:
     int T;
     int day; // 为了方便我使用时间
+    int K;
     bool isPeak = false;
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
@@ -564,7 +567,10 @@ private:
 
                 if(!canSteal) {
                     ServerType *m;
-                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() < RAND_MAX*0.2){
+                    const int kMinimumLimit = 10;
+                    const double highRate = 0.2;
+
+                    if (isPeak && ((vmDieInK.find(vm->id) != vmDieInK.end() && K > kMinimumLimit)||(K <= kMinimumLimit && rand() < RAND_MAX*highRate))){
                         for (auto &am : findHighExpPMTypeList[vm->category]) {
                             if (am->canDeployVM(vm)) {
                                 m = am;
