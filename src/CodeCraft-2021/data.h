@@ -450,11 +450,14 @@ public:
     }
 };
 
+class ServerShadowFactory;
+
 // Server 的影子对象
 class ServerShadow : public Server {
 public:
-    ServerShadow(Server *_src, ServerShadowFactory *_factory) :
-            src(_src), vmDeployMap(_vmDeployMap), Server(*_src) {}
+    ServerShadow(Server *_src, ServerShadowFactory *_factory,
+                 std::unordered_map<int, std::pair<int, Server::DeployNode>> *_vmDeployMap) :
+            src(_src), factory(_factory), vmDeployMap(_vmDeployMap), Server(*_src) {}
 
     void deploy(VM *vm, DeployNode node) override {
         if (vmDeployMap->find(vm->id) != vmDeployMap->end()) {
@@ -575,13 +578,13 @@ public:
     ServerShadowFactory(const ServerShadowFactory &_factory) {
         vmDeployMap = _factory.vmDeployMap;
         for (auto[id, _shadow] : _factory.shadowMap) {
-            shadowMap[id] = new ServerShadow(_shadow, this);
+            shadowMap[id] = new ServerShadow(_shadow, this, &vmDeployMap);
         }
     }
 
     ServerShadow *getServerShadow(Server *src) {
         if (shadowMap.find(src->id) == shadowMap.end()) {
-            shadowMap[src->id] = new ServerShadow(src, this);
+            shadowMap[src->id] = new ServerShadow(src, this, &vmDeployMap);
         }
         return shadowMap[src->id];
     }
