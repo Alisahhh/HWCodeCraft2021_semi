@@ -564,7 +564,7 @@ private:
 
                 if(!canSteal) {
                     ServerType *m;
-                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() > RAND_MAX*0.8){
+                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() < RAND_MAX*0.2){
                         for (auto &am : findHighExpPMTypeList[vm->category]) {
                             if (am->canDeployVM(vm)) {
                                 m = am;
@@ -575,6 +575,7 @@ private:
                         aliveM->isHigh = true;
                     }else{
                         for (auto &am : machineListForSort[vm->category]) {
+                            //if (am->cpu > 400 && am->memory > 400) continue;
                             if (am->canDeployVM(vm)) {
                                 m = am;
                                 break;
@@ -787,35 +788,66 @@ private:
     }
 
     void checkUsedRate() {
-        int resourceTotalCPU[2] = {};
-        int resourceTotalMem[2] = {};
-        int resourceEmptyCPU[2] = {};
-        int resourceEmptyMem[2] = {};
-        int emptyMachine[2] = {};
+        int resourceTotalCPU[2] = {0};
+        int resourceTotalMem[2] = {0};
+        int resourceEmptyCPU[2] = {0};
+        int resourceEmptyMem[2] = {0};
+        int emptyMachine[2] = {0};
+
+        int hresourceTotalCPU[2] = {0};
+        int hresourceTotalMem[2] = {0};
+        int hresourceEmptyCPU[2] = {0};
+        int hresourceEmptyMem[2] = {0};
+        int hemptyMachine[2] = {0};
+        int htotalMachine[2] = {0};
+
         for (int i = 0; i < 2; i++) {
             for (auto &aliveM : aliveMachineList[i]) {
+                if(aliveM.second->isHigh) {
+                    htotalMachine[i]++;
+                }
                 if (aliveM.second->empty()) {
                     emptyMachine[i]++;
+                    if(aliveM.second->isHigh){
+                        hemptyMachine[i]++;
+                    }
                     continue;
                 }
-                // if(aliveM.second.empty()) continue;
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
-                resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
-                resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
-                resourceTotalCPU[i] += aliveM.second->cpu;
-                resourceTotalMem[i] += aliveM.second->memory;
+
+                if (aliveM.second->isHigh){
+                    hresourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                    hresourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                    hresourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                    hresourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                    hresourceTotalCPU[i] += aliveM.second->cpu;
+                    hresourceTotalMem[i] += aliveM.second->memory;
+                }else{
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_0);
+                    resourceEmptyCPU[i] += aliveM.second->getLeftCPU(Server::NODE_1);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_0);
+                    resourceEmptyMem[i] += aliveM.second->getLeftMemory(Server::NODE_1);
+                    resourceTotalCPU[i] += aliveM.second->cpu;
+                    resourceTotalMem[i] += aliveM.second->memory;
+                }
 
             }
         }
         for (int i = 0; i < 2; i++) {
             volatile double cpuEmptyRate = 0;
             volatile double memEmptyRate = 0;
+            volatile double hcpuEmptyRate = 0;
+            volatile double hmemEmptyRate = 0;
 
             if (resourceTotalCPU[i])
                 cpuEmptyRate = (resourceEmptyCPU[i] + 0.0) / resourceTotalCPU[i];
             if (resourceTotalMem[i])
                 memEmptyRate = (resourceEmptyMem[i] + 0.0) / resourceTotalMem[i];
+
+            if (hresourceTotalCPU[i])
+                hcpuEmptyRate = (hresourceEmptyCPU[i] + 0.0) / hresourceTotalCPU[i];
+            if (hresourceTotalMem[i])
+                hmemEmptyRate = (hresourceEmptyMem[i] + 0.0) / hresourceTotalMem[i];
+
 
             int cpuLowCnt = 0;
             int cpuHighCnt = 0;
@@ -862,6 +894,7 @@ private:
                       << aliveMachineList[i].size() << ", " << emptyMachine[i] << ", "
                       << cpuHighCnt << ", " << cpuLowCnt << ", " << memHighCnt << ", "
                       << memLowCnt << ", " << dualHighCnt << ", " << dualLowCnt << std::endl;
+            std::clog << hcpuEmptyRate << ", " << hmemEmptyRate << ", " << htotalMachine[i] << ", " << hemptyMachine[i] << std::endl;
         }
 
         fprintf(stderr, "%d %d %d %d %d %d %d %d %d %d\n",vmAliveTimeCnt[0],vmAliveTimeCnt[1],vmAliveTimeCnt[2],vmAliveTimeCnt[3],vmAliveTimeCnt[4],vmAliveTimeCnt[5],vmAliveTimeCnt[6],vmAliveTimeCnt[7],vmAliveTimeCnt[8],vmAliveTimeCnt[9]);

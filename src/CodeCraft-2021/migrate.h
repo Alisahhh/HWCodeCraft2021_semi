@@ -189,6 +189,8 @@ class Migrator {
             for (auto &pm : aliveMachineList[i]) {
                 if (pm.second->empty())
                     continue;
+                if (pm.second->isHigh)
+                    continue;
                 pmIdAllList[i].push_back(pm.first);
             }
 
@@ -937,6 +939,9 @@ class Migrator {
                   [deployType, this](int &pmIdi, int &pmIdj) {
                       auto pmi = aliveMachineList[deployType][pmIdi];
                       auto pmj = aliveMachineList[deployType][pmIdj];
+                        if(pmi->isHigh != pmj->isHigh){
+                            return pmi->isHigh;
+                        }
 
                       return fcmp((pmi->cpu - pmi->getLeftCPU() +
                                    (pmi->memory - pmi->getLeftMemory()) *
