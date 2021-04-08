@@ -7,21 +7,22 @@
 #include <iomanip>
 #include <set>
 #include <unordered_map>
+#include <list>
 
 #include "data.h"
 #include "debug.h"
 #include "util.h"
 
 class Migrator {
-  public:
+public:
     Migrator(std::unordered_map<int, Server *> *_aliveMachineList) {
         aliveMachineList = _aliveMachineList;
     }
 
     int migrateScatteredVM(
-        int day, int limit,
-        std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList,
-        volatile double thr = 0.1) {
+            int day, int limit,
+            std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList,
+            volatile double thr = 0.1) {
         if (limit == 0)
             return 0;
         std::vector<int> pmIdList[2];
@@ -64,16 +65,16 @@ class Migrator {
                 i = 0;
             } else {
                 auto pmOneNode =
-                    aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
+                        aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
                 auto pmTwoNode =
-                    aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
+                        aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
-                              MEMORY_PARA) -
+                          MEMORY_PARA) -
                          (pmTwoNode->cpu - pmTwoNode->getLeftCPU() +
                           (pmTwoNode->memory - pmTwoNode->getLeftMemory()) *
-                              MEMORY_PARA)) < 0) {
+                          MEMORY_PARA)) < 0) {
                     outPMId = pmIdListForVMSelect[0][onePnt++];
                     i = 0;
                 } else {
@@ -96,7 +97,7 @@ class Migrator {
 
             std::set<int> cacheVMIdList;
             auto vmList = Server::getServer(outPMId)->getAllDeployedVMs();
-            for (auto [vm, deployNode] : vmList) {
+            for (auto[vm, deployNode] : vmList) {
                 cacheVMIdList.insert(vm->id);
             }
 
@@ -123,38 +124,38 @@ class Migrator {
                 if (type == Server::NODE_0 || type == Server::NODE_1) {
                     auto pm = aliveMachineList[i][inPMID];
                     treeArray[i].update(
-                        pmIdList[i].size() - pos,
-                        std::make_pair(
-                            std::max(pm->getLeftCPU(Server::NODE_0),
-                                     pm->getLeftCPU(Server::NODE_1)),
-                            std::max(pm->getLeftMemory(Server::NODE_0),
-                                     pm->getLeftMemory(Server::NODE_1))));
+                            pmIdList[i].size() - pos,
+                            std::make_pair(
+                                    std::max(pm->getLeftCPU(Server::NODE_0),
+                                             pm->getLeftCPU(Server::NODE_1)),
+                                    std::max(pm->getLeftMemory(Server::NODE_0),
+                                             pm->getLeftMemory(Server::NODE_1))));
                     pm = aliveMachineList[i][outPMId];
                     treeArray[i].update(
-                        pmIdList[i].size() - onePnt + 1,
-                        std::make_pair(
-                            std::max(pm->getLeftCPU(Server::NODE_0),
-                                     pm->getLeftCPU(Server::NODE_1)),
-                            std::max(pm->getLeftMemory(Server::NODE_0),
-                                     pm->getLeftMemory(Server::NODE_1))));
+                            pmIdList[i].size() - onePnt + 1,
+                            std::make_pair(
+                                    std::max(pm->getLeftCPU(Server::NODE_0),
+                                             pm->getLeftCPU(Server::NODE_1)),
+                                    std::max(pm->getLeftMemory(Server::NODE_0),
+                                             pm->getLeftMemory(Server::NODE_1))));
                 } else {
                     auto pm = aliveMachineList[i][inPMID];
                     treeArray[i].update(
-                        pmIdList[i].size() - pos,
-                        std::make_pair(pm->getLeftCPU(Server::NODE_0),
-                                       pm->getLeftMemory(Server::NODE_1)));
+                            pmIdList[i].size() - pos,
+                            std::make_pair(pm->getLeftCPU(Server::NODE_0),
+                                           pm->getLeftMemory(Server::NODE_1)));
                     pm = aliveMachineList[i][outPMId];
                     treeArray[i].update(
-                        pmIdList[i].size() - twoPnt + 1,
-                        std::make_pair(
-                            std::max(pm->getLeftCPU(Server::NODE_0),
-                                     pm->getLeftCPU(Server::NODE_1)),
-                            std::max(pm->getLeftMemory(Server::NODE_0),
-                                     pm->getLeftMemory(Server::NODE_1))));
+                            pmIdList[i].size() - twoPnt + 1,
+                            std::make_pair(
+                                    std::max(pm->getLeftCPU(Server::NODE_0),
+                                             pm->getLeftCPU(Server::NODE_1)),
+                                    std::max(pm->getLeftMemory(Server::NODE_0),
+                                             pm->getLeftMemory(Server::NODE_1))));
                 }
                 migrationList.emplace_back(
-                    localVMID, inPMID,
-                    static_cast<ServerType::DeployNode>(type));
+                        localVMID, inPMID,
+                        static_cast<ServerType::DeployNode>(type));
                 migCnt++;
 
                 if (migCnt >= limit || finFlag)
@@ -171,9 +172,9 @@ class Migrator {
     }
 
     int combineLowLoadRatePM(
-        int day, int limit,
-        std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList,
-        double thr = 0.3) {
+            int day, int limit,
+            std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList,
+            double thr = 0.3) {
         std::vector<int> pmIdAllList[2];
         std::vector<int> pmIdSelectedList[2];
         std::set<int> vmIdSet[2];
@@ -220,10 +221,10 @@ class Migrator {
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
-                              MEMORY_PARA) -
+                          MEMORY_PARA) -
                          (pmTwoNode->cpu - pmTwoNode->getLeftCPU() +
                           (pmTwoNode->memory - pmTwoNode->getLeftMemory()) *
-                              MEMORY_PARA)) < 0) {
+                          MEMORY_PARA)) < 0) {
                     outPMId = pmIdAllList[0][onePnt++];
                     i = 0;
                 } else {
@@ -266,9 +267,9 @@ class Migrator {
                 vmIdSet[i].clear();
                 for (auto &curPM : pmIdSelectedList[i]) {
                     auto vmList =
-                        migrateSimulationServer.getServerShadow(curPM)
-                            ->getAllDeployedVMs();
-                    for (auto [vm, deployNode] : vmList) {
+                            migrateSimulationServer.getServerShadow(curPM)
+                                    ->getAllDeployedVMs();
+                    for (auto[vm, deployNode] : vmList) {
                         vmIdSet[i].insert(vm->id);
                     }
                 }
@@ -300,12 +301,12 @@ class Migrator {
                             migrateSimulationServer.getDeployServer(curVM)
                                     ->id != curPMID) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::DUAL_NODE);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::DUAL_NODE);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                             }
                             canDeployFlag = true;
@@ -314,10 +315,10 @@ class Migrator {
 
                     if (canDeployFlag) {
                         auto outPM =
-                            migrateSimulationServer.getDeployServer(minVMId);
+                                migrateSimulationServer.getDeployServer(minVMId);
                         shakeOrder[0].push_back(minVMId);
                         shakeLink[0][minVMId] =
-                            std::make_pair(outPM->id, curPMID);
+                                std::make_pair(outPM->id, curPMID);
                         shakeType[0][minVMId] = Server::DUAL_NODE;
                         migCnt++;
                         placeVMShadow(migrateSimulationServer, outPM->id,
@@ -331,7 +332,7 @@ class Migrator {
                     break;
 
                 auto vmList = curPM->getAllDeployedVMs();
-                for (auto [vm, deployNode] : vmList) {
+                for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
                         vmIdSet[nodeType].end()) {
                         vmIdSet[nodeType].erase(vm->id);
@@ -359,14 +360,15 @@ class Migrator {
                         if (curPM->canDeployVM(VM::getVM(curVM),
                                                Server::NODE_0) &&
                             (migrateSimulationServer.getDeployServer(curVM)
-                                    ->id != curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_0*/)) {
+                                     ->id !=
+                             curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_0*/)) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::NODE_0);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::NODE_0);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                                 minType = Server::NODE_0;
                             }
@@ -375,14 +377,15 @@ class Migrator {
                         if (curPM->canDeployVM(VM::getVM(curVM),
                                                Server::NODE_1) &&
                             (migrateSimulationServer.getDeployServer(curVM)
-                                    ->id != curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_1*/)) {
+                                     ->id !=
+                             curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_1*/)) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::NODE_1);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::NODE_1);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                                 minType = Server::NODE_1;
                             }
@@ -392,10 +395,10 @@ class Migrator {
 
                     if (canDeployFlag) {
                         auto outPM =
-                            migrateSimulationServer.getDeployServer(minVMId);
+                                migrateSimulationServer.getDeployServer(minVMId);
                         shakeOrder[0].push_back(minVMId);
                         shakeLink[0][minVMId] =
-                            std::make_pair(outPM->id, curPMID);
+                                std::make_pair(outPM->id, curPMID);
                         shakeType[0][minVMId] = minType;
                         migCnt++;
                         placeVMShadow(migrateSimulationServer, outPM->id,
@@ -408,7 +411,7 @@ class Migrator {
                     break;
 
                 auto vmList = curPM->getAllDeployedVMs();
-                for (auto [vm, deployNode] : vmList) {
+                for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
                         vmIdSet[nodeType].end()) {
                         vmIdSet[nodeType].erase(vm->id);
@@ -425,9 +428,9 @@ class Migrator {
                 vmIdSet[i].clear();
                 for (auto &curPM : pmIdSelectedList[i]) {
                     auto vmList =
-                        migrateSimulationServer.getServerShadow(curPM)
-                            ->getAllDeployedVMs();
-                    for (auto [vm, deployNode] : vmList) {
+                            migrateSimulationServer.getServerShadow(curPM)
+                                    ->getAllDeployedVMs();
+                    for (auto[vm, deployNode] : vmList) {
                         vmIdSet[i].insert(vm->id);
                     }
                 }
@@ -459,12 +462,12 @@ class Migrator {
                             migrateSimulationServer.getDeployServer(curVM)
                                     ->id != curPMID) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::DUAL_NODE);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::DUAL_NODE);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                             }
                             canDeployFlag = true;
@@ -473,7 +476,7 @@ class Migrator {
 
                     if (canDeployFlag) {
                         auto outPM =
-                            migrateSimulationServer.getDeployServer(minVMId);
+                                migrateSimulationServer.getDeployServer(minVMId);
                         if (shakeLink[0].find(minVMId) != shakeLink[0].end() &&
                             curPMID == shakeLink[0][minVMId].first &&
                             Server::DUAL_NODE == shakeType[0][minVMId]) {
@@ -483,7 +486,7 @@ class Migrator {
                         } else {
                             shakeOrder[1].push_back(minVMId);
                             shakeLink[1][minVMId] =
-                                std::make_pair(outPM->id, curPMID);
+                                    std::make_pair(outPM->id, curPMID);
                             shakeType[1][minVMId] = Server::DUAL_NODE;
                             migCnt++;
                         }
@@ -498,8 +501,8 @@ class Migrator {
                     break;
 
                 auto vmList = migrateSimulationServer.getServerShadow(curPM)
-                                  ->getAllDeployedVMs();
-                for (auto [vm, deployNode] : vmList) {
+                        ->getAllDeployedVMs();
+                for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
                         vmIdSet[nodeType].end()) {
                         vmIdSet[nodeType].erase(vm->id);
@@ -527,14 +530,15 @@ class Migrator {
                         if (curPM->canDeployVM(VM::getVM(curVM),
                                                Server::NODE_0) &&
                             (migrateSimulationServer.getDeployServer(curVM)
-                                    ->id != curPMID  /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_0*/)) {
+                                     ->id !=
+                             curPMID  /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_0*/)) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::NODE_0);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::NODE_0);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                                 minType = Server::NODE_0;
                             }
@@ -542,15 +546,16 @@ class Migrator {
                         }
                         if (curPM->canDeployVM(VM::getVM(curVM),
                                                Server::NODE_1) && (
-                            migrateSimulationServer.getDeployServer(curVM)
-                                    ->id != curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_1*/)) {
+                                    migrateSimulationServer.getDeployServer(curVM)
+                                            ->id !=
+                                    curPMID /*|| migrateSimulationServer.getDeployInfo(curVM).second != Server::NODE_1*/)) {
                             int curRemainResourceWeightedSum =
-                                getRemainResourceWeightedSum(
-                                    curPM, VM::getVM(curVM), Server::NODE_1);
+                                    getRemainResourceWeightedSum(
+                                            curPM, VM::getVM(curVM), Server::NODE_1);
                             if (curRemainResourceWeightedSum <
                                 minRemainResourceWeightedSum) {
                                 minRemainResourceWeightedSum =
-                                    curRemainResourceWeightedSum;
+                                        curRemainResourceWeightedSum;
                                 minVMId = curVM;
                                 minType = Server::NODE_1;
                             }
@@ -560,7 +565,7 @@ class Migrator {
 
                     if (canDeployFlag) {
                         auto outPM =
-                            migrateSimulationServer.getDeployServer(minVMId);
+                                migrateSimulationServer.getDeployServer(minVMId);
                         if (shakeLink[0].find(minVMId) != shakeLink[0].end() &&
                             curPMID == shakeLink[0][minVMId].first &&
                             minType == shakeType[0][minVMId]) {
@@ -570,7 +575,7 @@ class Migrator {
                         } else {
                             shakeOrder[1].push_back(minVMId);
                             shakeLink[1][minVMId] =
-                                std::make_pair(outPM->id, curPMID);
+                                    std::make_pair(outPM->id, curPMID);
                             shakeType[1][minVMId] = minType;
                             migCnt++;
                         }
@@ -584,8 +589,8 @@ class Migrator {
                     break;
 
                 auto vmList = migrateSimulationServer.getServerShadow(curPM)
-                                  ->getAllDeployedVMs();
-                for (auto [vm, deployNode] : vmList) {
+                        ->getAllDeployedVMs();
+                for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
                         vmIdSet[nodeType].end()) {
                         vmIdSet[nodeType].erase(vm->id);
@@ -630,8 +635,8 @@ class Migrator {
     }
 
     int clearHighExpensesPMs(
-        int day, int limit,
-        std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
+            int day, int limit,
+            std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
         std::vector<int> emptyPMIdList[2];
         std::vector<int> nonEmptyPMIdList[2];
         std::vector<int> highExpPMIdList[2];
@@ -660,8 +665,8 @@ class Migrator {
             sortPMByDailyCost(nonEmptyPMIdList[nodeType]);
         }
 
-        int ableToMigCnt[2] = {(limit * (int)emptyPMIdList[0].size()) / emptyCnt,
-                               (limit * (int)emptyPMIdList[1].size()) / emptyCnt};
+        int ableToMigCnt[2] = {(limit * (int) emptyPMIdList[0].size()) / emptyCnt,
+                               (limit * (int) emptyPMIdList[1].size()) / emptyCnt};
         int migCnt = 0;
         const int pmPoolLimit = 5;
         const int ignoreMigTimesLimit = 10;
@@ -697,12 +702,12 @@ class Migrator {
                             pmPoolIndex--;
                             if (pmPoolIndex < 0) break;
                             curHighExpPMId =
-                                nonEmptyPMIdList[nodeType][pmPoolIndex];
+                                    nonEmptyPMIdList[nodeType][pmPoolIndex];
                             curHighExpPM = Server::getServer(curHighExpPMId);
                         } while (curHighExpPM->empty() ||
                                  curPM->category != curHighExpPM->category);
 
-                        if(pmPoolIndex < 0){
+                        if (pmPoolIndex < 0) {
                             noMoreMig[curPM->category] = true;
                             break;
                         }
@@ -715,7 +720,7 @@ class Migrator {
                         }
                         pmPool.insert(curHighExpPMId);
                         for (auto &vm : Server::getServer(curHighExpPMId)
-                                            ->getAllDeployedVMs()) {
+                                ->getAllDeployedVMs()) {
                             vmPool.insert(vm.first->id);
                         }
                         // fprintf(stderr, "pool state %d %d\n",pmPool.size(),
@@ -731,13 +736,13 @@ class Migrator {
                             if (curPM->canDeployVM(VM::getVM(curVM)) &&
                                 Server::getDeployServer(curVM)->id != curPMId) {
                                 int curRemainResourceWeightedSum =
-                                    getRemainResourceWeightedSum(
-                                        curPM, VM::getVM(curVM),
-                                        Server::DUAL_NODE);
+                                        getRemainResourceWeightedSum(
+                                                curPM, VM::getVM(curVM),
+                                                Server::DUAL_NODE);
                                 if (curRemainResourceWeightedSum <
                                     minRemainResourceWeightedSum) {
                                     minRemainResourceWeightedSum =
-                                        curRemainResourceWeightedSum;
+                                            curRemainResourceWeightedSum;
                                     minVMId = curVM;
                                     canDeployFlag = true;
                                 }
@@ -762,15 +767,16 @@ class Migrator {
                         for (auto &curVM : vmPool) {
                             if (curPM->canDeployVM(VM::getVM(curVM),
                                                    Server::NODE_0) &&
-                                (Server::getDeployServer(curVM)->id != curPMId || Server::getDeployInfo(curVM).second != Server::NODE_0)) {
+                                (Server::getDeployServer(curVM)->id != curPMId ||
+                                 Server::getDeployInfo(curVM).second != Server::NODE_0)) {
                                 int curRemainResourceWeightedSum =
-                                    getRemainResourceWeightedSum(
-                                        curPM, VM::getVM(curVM),
-                                        Server::NODE_0);
+                                        getRemainResourceWeightedSum(
+                                                curPM, VM::getVM(curVM),
+                                                Server::NODE_0);
                                 if (curRemainResourceWeightedSum <
                                     minRemainResourceWeightedSum) {
                                     minRemainResourceWeightedSum =
-                                        curRemainResourceWeightedSum;
+                                            curRemainResourceWeightedSum;
                                     minVMId = curVM;
                                     minType = Server::NODE_0;
                                     canDeployFlag = true;
@@ -778,15 +784,16 @@ class Migrator {
                             }
                             if (curPM->canDeployVM(VM::getVM(curVM),
                                                    Server::NODE_1) &&
-                                (Server::getDeployServer(curVM)->id != curPMId || Server::getDeployInfo(curVM).second != Server::NODE_1)) {
+                                (Server::getDeployServer(curVM)->id != curPMId ||
+                                 Server::getDeployInfo(curVM).second != Server::NODE_1)) {
                                 int curRemainResourceWeightedSum =
-                                    getRemainResourceWeightedSum(
-                                        curPM, VM::getVM(curVM),
-                                        Server::NODE_1);
+                                        getRemainResourceWeightedSum(
+                                                curPM, VM::getVM(curVM),
+                                                Server::NODE_1);
                                 if (curRemainResourceWeightedSum <
                                     minRemainResourceWeightedSum) {
                                     minRemainResourceWeightedSum =
-                                        curRemainResourceWeightedSum;
+                                            curRemainResourceWeightedSum;
                                     minVMId = curVM;
                                     minType = Server::NODE_1;
                                     canDeployFlag = true;
@@ -813,7 +820,7 @@ class Migrator {
                             pmNeedDel.push_back(pm);
                         }
                     }
-                    for (auto &pm : pmNeedDel){
+                    for (auto &pm : pmNeedDel) {
                         pmPool.erase(pm);
                     }
 
@@ -828,7 +835,7 @@ class Migrator {
         return migCnt;
     }
 
-  private:
+private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
     volatile const double MEMORY_PARA = 0.47;
@@ -852,28 +859,28 @@ class Migrator {
                                    pmi->getLeftCPU(Server::NODE_1) +
                                    (pmi->getLeftMemory(Server::NODE_0) +
                                     pmi->getLeftMemory(Server::NODE_1)) *
-                                       MEMORY_PARA) -
+                                   MEMORY_PARA) -
                                   (pmj->getLeftCPU(Server::NODE_0) +
                                    pmj->getLeftCPU(Server::NODE_1) +
                                    (pmj->getLeftMemory(Server::NODE_0) +
                                     pmj->getLeftMemory(Server::NODE_1)) *
-                                       MEMORY_PARA)) > 0;
+                                   MEMORY_PARA)) > 0;
                   });
         treeArray[deployType].setSize(pmIdList.size());
         for (int i = 1; i <= pmIdList.size(); i++) {
             Server *pm =
-                aliveMachineList[deployType][pmIdList[pmIdList.size() - i]];
+                    aliveMachineList[deployType][pmIdList[pmIdList.size() - i]];
             if (deployType == VMType::SINGLE) {
                 treeArray[deployType].update(
-                    i, std::make_pair(
-                           std::max(pm->getLeftCPU(Server::NODE_0),
-                                    pm->getLeftCPU(Server::NODE_1)),
-                           std::max(pm->getLeftMemory(Server::NODE_0),
-                                    pm->getLeftMemory(Server::NODE_1))));
+                        i, std::make_pair(
+                                std::max(pm->getLeftCPU(Server::NODE_0),
+                                         pm->getLeftCPU(Server::NODE_1)),
+                                std::max(pm->getLeftMemory(Server::NODE_0),
+                                         pm->getLeftMemory(Server::NODE_1))));
             } else {
                 treeArray[deployType].update(
-                    i, std::make_pair(pm->getLeftCPU(Server::NODE_0),
-                                      pm->getLeftMemory(Server::NODE_0)));
+                        i, std::make_pair(pm->getLeftCPU(Server::NODE_0),
+                                          pm->getLeftMemory(Server::NODE_0)));
             }
         }
         return pmIdList.size();
@@ -940,10 +947,10 @@ class Migrator {
 
                       return fcmp((pmi->cpu - pmi->getLeftCPU() +
                                    (pmi->memory - pmi->getLeftMemory()) *
-                                       MEMORY_PARA) -
+                                   MEMORY_PARA) -
                                   (pmj->cpu - pmj->getLeftCPU() +
                                    (pmj->memory - pmj->getLeftMemory()) *
-                                       MEMORY_PARA)) < 0;
+                                   MEMORY_PARA)) < 0;
                   });
 
         return pmIdList.size();
@@ -953,15 +960,15 @@ class Migrator {
     getRemainResourceWeightedSum(Server *pm, VM *vm,
                                  Server::DeployNode dn = Server::DUAL_NODE) {
         volatile double diff = std::abs(
-            (double)(pm->getLeftCPU(dn) - vm->cpu) / (pm->cpu) -
-            (double)(pm->getLeftMemory(dn) - vm->memory) / (pm->memory));
+                (double) (pm->getLeftCPU(dn) - vm->cpu) / (pm->cpu) -
+                (double) (pm->getLeftMemory(dn) - vm->memory) / (pm->memory));
         volatile const double arg1 = 10;
         const int arg2 = 3;
 
         return ((pm->getLeftCPU(dn) - vm->cpu) *
-                    FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
+                FIND_PM_REMAIN_CPU_WRIGHT[vm->category] +
                 (pm->getLeftMemory(dn) - vm->memory) *
-                    FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category]) *
+                FIND_PM_REMAIN_MEMORY_WRIGHT[vm->category]) *
                (1 + pow(diff * arg1, arg2));
 
         // return std::abs((pm->getLeftCPU(dn) - vm->cpu) -
@@ -969,7 +976,7 @@ class Migrator {
     }
 
     int compareAliveM(Server *nowNode, Server *lastNode, VM *vm, Server::DeployNode deployNode,
-                             Server::DeployNode lastDeployNode = Server::NODE_0) {
+                      Server::DeployNode lastDeployNode = Server::NODE_0) {
         if (nowNode->getCategory(deployNode) != lastNode->getCategory(lastDeployNode)) {
             if (nowNode->getCategory(deployNode) == vm->category) {
                 return -1;
@@ -1093,7 +1100,7 @@ class Migrator {
         if (deployType == VMType::DUAL) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId =
-                    static_cast<std::vector<int>::iterator>(&pmIdList[i]);
+                        static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same
                 // machine
                 if (*curPMId == outPmID)
@@ -1123,18 +1130,19 @@ class Migrator {
                         }
                     }
                     */
-                   if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE, ServerType::DUAL_NODE) < 0){
-                       targetPMId = curPM->id;
-                       targetType = ServerType::DUAL_NODE;
-                       position = i;
-                       minusCnt++;
-                   }
+                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE,
+                                                        ServerType::DUAL_NODE) < 0) {
+                        targetPMId = curPM->id;
+                        targetType = ServerType::DUAL_NODE;
+                        position = i;
+                        minusCnt++;
+                    }
                 }
             }
         } else if (deployType == VMType::SINGLE) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
                 auto curPMId =
-                    static_cast<std::vector<int>::iterator>(&pmIdList[i]);
+                        static_cast<std::vector<int>::iterator>(&pmIdList[i]);
                 // avoid migrating vm to even lower load machines or to the same
                 // machine
 
@@ -1150,7 +1158,7 @@ class Migrator {
                     if (curPM->getCategory(Server::NODE_0) == vm->category) {
                         if (*curPMId != outPmID ||
                             Server::getDeployInfo(vm->id).second !=
-                                Server::NODE_0) {
+                            Server::NODE_0) {
                             FlagA = true;
                         }
                         // step = 1;
@@ -1160,7 +1168,7 @@ class Migrator {
                     if (curPM->getCategory(Server::NODE_1) == vm->category) {
                         if (*curPMId != outPmID ||
                             Server::getDeployInfo(vm->id).second !=
-                                Server::NODE_1) {
+                            Server::NODE_1) {
                             FlagB = true;
                         }
                         // step = 1;
@@ -1169,9 +1177,9 @@ class Migrator {
 
                 if (FlagA) {
                     //findCnt++;
-                    
+
                     remainResourceWeightedSum =
-                        getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
+                            getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_0;
@@ -1190,9 +1198,9 @@ class Migrator {
                 }
                 if (FlagB) {
                     //findCnt++;
-                    
+
                     remainResourceWeightedSum =
-                        getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
+                            getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_1;
@@ -1250,5 +1258,46 @@ class Migrator {
                 1 - outPm->getMemoryUsage(), 1 - inPm->getCPUUsage(),
                 1 - inPm->getMemoryUsage());
 #endif
+    }
+
+    static void applyMigration(ServerShadowFactory *factory) {
+        std::list<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>> G;
+        auto vmMap = VM::getVMMap();
+        for (auto[vmID, vm] : *vmMap) {
+            auto[_server, _node] = factory->getDeployInfo(vm->id);
+            auto[server, node] = Server::getDeployInfo(vm->id);
+            if (server->id != _server->id || node != _node) {
+                G.emplace_back(vm, server, node, _server, _node);
+            }
+        }
+
+        Server *s = nullptr;
+        auto serverMap = Server::getServerMap();
+        std::vector<Server *> emptyServer;
+        for (auto[serverID, server] : *serverMap) {
+            if (server->empty()) {
+                emptyServer.push_back(server);
+            }
+        }
+
+        std::sort(emptyServer.begin(), emptyServer.end(), [](Server *a, Server *b) {
+            return a->cpu + a->memory > b->cpu + b->memory;
+        });
+
+//        std::unordered_map<VM *, Server *>
+        while (!G.empty()) {
+            bool flagNoApply = true;
+            for (auto[vm, oldServer, oldNode, newServer, newNode] : G) {
+                if (newServer->canDeployVM(vm, newNode)) {
+                    oldServer->remove(vm);
+                    newServer->deploy(vm, newNode);
+                    flagNoApply = false;
+                }
+            }
+
+            if (flagNoApply) {
+
+            }
+        }
     }
 };

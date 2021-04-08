@@ -24,13 +24,13 @@ SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -march=native -O3  -std=c++17")
 # 查找当前目录下的所有源文件
 # 并将名称保存到 DIR_LIB_SRCS 变量
 
-option(SUBMIT_MODE "enable submit to speed " ON)
-
-if(SUBMIT_MODE)
-    set(DIR_SRCS tmp/merged_file.cpp) # SUBMIT MODE
-else()
+#option(SUBMIT_MODE "enable submit to speed " ON)
+#
+#if(SUBMIT_MODE)
+#    set(DIR_SRCS tmp/merged_file.cpp) # SUBMIT MODE
+#else()
     aux_source_directory(. DIR_SRCS) # DEBUG MODE
-endif()
+#endif()
 
 #SET(CMAKE_C_COMPILER "/usr/bin/gcc-9")
 #SET(CMAKE_CXX_COMPILER "/usr/bin/g++-9")
