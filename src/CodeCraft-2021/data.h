@@ -128,6 +128,10 @@ public:
     static int getVMCount() {
         return vmMap.size();
     }
+
+    static std::unordered_map<int, VM *> const *getVMMap() {
+        return &vmMap;
+    }
 };
 
 // 服务器参数
@@ -437,6 +441,10 @@ public:
 
     static int getServerCount() {
         return serverMap.size();
+    }
+
+    static std::unordered_map<int, Server *> const *getServerMap() {
+        return &serverMap;
     }
 };
 
