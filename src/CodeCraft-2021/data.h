@@ -333,7 +333,7 @@ public:
 
 private:
     inline static int serverIDCounter;
-    inline static std::unordered_map<int, Server *> serverMap;
+    inline static std::vector<Server *> serverMap = {nullptr};
 
     inline static std::unordered_map<int, std::pair<int, DeployNode>> vmDeployMap;
     std::unordered_map<int, DeployNode> deployedVMs;
@@ -396,25 +396,13 @@ protected:
 public:
     static Server *newServer(const ServerType &type) {
         auto *server = new Server(++serverIDCounter, type);
-        serverMap[server->id] = server;
+        serverMap.push_back(server);
         return server;
     }
 
-    static void removeServer(int id) {
-        auto it = serverMap.find(id);
-        if (it == serverMap.end()) {
-            throw std::logic_error("Server::removeServer: given server id does not match any of the servers");
-        }
-        delete it->second; // 回收内存
-        serverMap.erase(it);
-    }
-
     static Server *getServer(int id) {
-        auto it = serverMap.find(id);
-        if (it == serverMap.end()) {
-            throw std::logic_error("Server::getServer: given server id does not match any of the servers");
-        }
-        return it->second;
+        if (id >= serverMap.size()) throw std::out_of_range("Server::getServer: server id out of bound");
+        return serverMap[id];
     }
 
     static Server *getDeployServer(int vmID) {
@@ -445,7 +433,7 @@ public:
         return serverMap.size();
     }
 
-    static std::unordered_map<int, Server *> const *getServerMap() {
+    static std::vector<Server *> const *getServerMap() {
         return &serverMap;
     }
 };
@@ -567,36 +555,53 @@ class ServerShadowFactory {
 private:
     friend class ServerShadow;
 
-    std::unordered_map<int, ServerShadow *> shadowMap;
+    std::vector<ServerShadow *> shadowMap;
     std::unordered_map<int, std::pair<int, Server::DeployNode>> vmDeployMap;
+    std::shared_ptr<ServerShadowFactory> factorySrc = nullptr;
 
 public:
     ServerShadowFactory() {
         vmDeployMap = Server::vmDeployMap;
+        shadowMap.resize(Server::getServerCount() + 1);
     }
 
-    ServerShadowFactory(const ServerShadowFactory &_factory) {
-        vmDeployMap = _factory.vmDeployMap;
-        for (auto[id, _shadow] : _factory.shadowMap) {
-            shadowMap[id] = new ServerShadow(_shadow, this, &vmDeployMap);
+    ServerShadowFactory(const std::shared_ptr<ServerShadowFactory> &_factory) {
+        factorySrc = _factory;
+        vmDeployMap = _factory->vmDeployMap;
+        shadowMap.resize(Server::getServerCount() + 1);
+        for (auto _shadow : _factory->shadowMap) {
+            if (!_shadow) continue;
+            shadowMap[_shadow->id] = new ServerShadow(_shadow, this, &vmDeployMap);
         }
     }
 
+private:
     ServerShadow *getServerShadow(Server *src) {
-        if (shadowMap.find(src->id) == shadowMap.end()) {
+        if (!shadowMap[src->id]) {
             shadowMap[src->id] = new ServerShadow(src, this, &vmDeployMap);
         }
         return shadowMap[src->id];
     }
 
+public:
     ServerShadow *getServerShadow(int srcID) {
-        auto src = Server::getServer(srcID);
+        Server *src;
+        if (factorySrc) {
+            src = factorySrc->getServerShadow(srcID);
+        } else {
+            src = Server::getServer(srcID);
+        }
         return getServerShadow(src);
     }
 
     void resetAll() {
-        vmDeployMap = Server::vmDeployMap;
-        for (auto[id, shadow] : shadowMap) {
+        if (factorySrc) {
+            vmDeployMap = factorySrc->vmDeployMap;
+        } else {
+            vmDeployMap = Server::vmDeployMap;
+        }
+        for (auto shadow : shadowMap) {
+            if (!shadow) continue;
             shadow->reset();
         }
     }
@@ -626,7 +631,7 @@ public:
     }
 
     virtual ~ServerShadowFactory() {
-        for (auto[id, shadow] : shadowMap) {
+        for (auto shadow : shadowMap) {
             delete shadow;
         }
     }

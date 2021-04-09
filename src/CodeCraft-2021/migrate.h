@@ -15,8 +15,9 @@
 
 class Migrator {
 public:
-    Migrator(std::unordered_map<int, Server *> *_aliveMachineList) {
+    Migrator(std::unordered_map<int, Server *> *_aliveMachineList, std::shared_ptr<ServerShadowFactory> _factory) {
         aliveMachineList = _aliveMachineList;
+        factory = _factory;
     }
 
     int migrateScatteredVM(
@@ -32,7 +33,7 @@ public:
         bool finFlag = false;
         for (int i = 0; i < 2; i++) {
             for (auto &pm : aliveMachineList[i]) {
-                if (pm.second->empty()) {
+                if (factory->getServerShadow(pm.first)->empty()) {
                     emptyPMCnt++;
                     continue;
                 }
@@ -64,10 +65,8 @@ public:
                 outPMId = pmIdListForVMSelect[0][onePnt++];
                 i = 0;
             } else {
-                auto pmOneNode =
-                        aliveMachineList[0][pmIdListForVMSelect[0][onePnt]];
-                auto pmTwoNode =
-                        aliveMachineList[1][pmIdListForVMSelect[1][twoPnt]];
+                auto pmOneNode = factory->getServerShadow(pmIdListForVMSelect[0][onePnt]);
+                auto pmTwoNode = factory->getServerShadow(pmIdListForVMSelect[1][twoPnt]);
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
@@ -83,7 +82,7 @@ public:
                 }
             }
 
-            auto outPM = Server::getServer(outPMId);
+            auto outPM = factory->getServerShadow(outPMId);
             // fprintf(stderr, "outpm %s %d\n",outPM->model.c_str(), outPMId);
 #ifdef DEBUG_O3
             std::clog << "outPM: " << outPM->id << std::fixed
@@ -96,7 +95,7 @@ public:
                 continue;
 
             std::set<int> cacheVMIdList;
-            auto vmList = Server::getServer(outPMId)->getAllDeployedVMs();
+            auto vmList = outPM->getAllDeployedVMs();
             for (auto[vm, deployNode] : vmList) {
                 cacheVMIdList.insert(vm->id);
             }
@@ -122,7 +121,7 @@ public:
                 placeVM(outPMId, inPMID, localVMID,
                         static_cast<ServerType::DeployNode>(type));
                 if (type == Server::NODE_0 || type == Server::NODE_1) {
-                    auto pm = aliveMachineList[i][inPMID];
+                    auto pm = factory->getServerShadow(inPMID);
                     treeArray[i].update(
                             pmIdList[i].size() - pos,
                             std::make_pair(
@@ -130,7 +129,7 @@ public:
                                              pm->getLeftCPU(Server::NODE_1)),
                                     std::max(pm->getLeftMemory(Server::NODE_0),
                                              pm->getLeftMemory(Server::NODE_1))));
-                    pm = aliveMachineList[i][outPMId];
+                    pm = factory->getServerShadow(outPMId);
                     treeArray[i].update(
                             pmIdList[i].size() - onePnt + 1,
                             std::make_pair(
@@ -139,12 +138,12 @@ public:
                                     std::max(pm->getLeftMemory(Server::NODE_0),
                                              pm->getLeftMemory(Server::NODE_1))));
                 } else {
-                    auto pm = aliveMachineList[i][inPMID];
+                    auto pm = factory->getServerShadow(inPMID);
                     treeArray[i].update(
                             pmIdList[i].size() - pos,
                             std::make_pair(pm->getLeftCPU(Server::NODE_0),
                                            pm->getLeftMemory(Server::NODE_1)));
-                    pm = aliveMachineList[i][outPMId];
+                    pm = factory->getServerShadow(outPMId);
                     treeArray[i].update(
                             pmIdList[i].size() - twoPnt + 1,
                             std::make_pair(
@@ -182,17 +181,18 @@ public:
         std::unordered_map<int, ServerType::DeployNode> shakeType[2];
         std::vector<int> shakeOrder[2];
         std::set<int> shakeFixVM[2];
-        ServerShadowFactory migrateSimulationServer;
+        ServerShadowFactory migrateSimulationServer(factory);
 
         bool finFlag = false;
 
         for (int i = 0; i < 2; i++) {
-            for (auto &pm : aliveMachineList[i]) {
-                if (pm.second->empty())
+            for (auto &pmID : aliveMachineList[i]) {
+                auto pm = factory->getServerShadow(pmID.first);
+                if (pm->empty())
                     continue;
-                if (pm.second->isHigh)
+                if (pm->isHigh)
                     continue;
-                pmIdAllList[i].push_back(pm.first);
+                pmIdAllList[i].push_back(pmID.first);
             }
 
             sortPMByUsedAmount(static_cast<VM::DeployType>(i), pmIdAllList[i]);
@@ -218,8 +218,8 @@ public:
                 outPMId = pmIdAllList[0][onePnt++];
                 i = 0;
             } else {
-                auto pmOneNode = aliveMachineList[0][pmIdAllList[0][onePnt]];
-                auto pmTwoNode = aliveMachineList[1][pmIdAllList[1][twoPnt]];
+                auto pmOneNode = factory->getServerShadow(pmIdAllList[0][onePnt]);
+                auto pmTwoNode = factory->getServerShadow(pmIdAllList[1][twoPnt]);
 
                 if (fcmp((pmOneNode->cpu - pmOneNode->getLeftCPU() +
                           (pmOneNode->memory - pmOneNode->getLeftMemory()) *
@@ -235,14 +235,13 @@ public:
                 }
             }
 
-            auto pm = aliveMachineList[i][outPMId];
+            auto pm = factory->getServerShadow(outPMId);
             const double migRate = 0.3;
             if (fcmp(pm->getCPUUsage() - thr) > 0 &&
                 fcmp(pm->getMemoryUsage() - thr) > 0) {
                 auto outPMDeployedVMNums = pm->getAllDeployedVMs().size();
                 selectVmCnt += outPMDeployedVMNums;
                 pmIdSelectedList[i].push_back(outPMId);
-                migrateSimulationServer.getServerShadow(pm);
                 if (selectVmCnt * migRate >= limit)
                     break;
             }
@@ -502,7 +501,7 @@ public:
                 if (migCnt >= limit || finFlag)
                     break;
 
-                auto vmList = migrateSimulationServer.getServerShadow(curPM)
+                auto vmList = migrateSimulationServer.getServerShadow(curPMID)
                         ->getAllDeployedVMs();
                 for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
@@ -590,7 +589,7 @@ public:
                 if (migCnt >= limit || finFlag)
                     break;
 
-                auto vmList = migrateSimulationServer.getServerShadow(curPM)
+                auto vmList = migrateSimulationServer.getServerShadow(curPMID)
                         ->getAllDeployedVMs();
                 for (auto[vm, deployNode] : vmList) {
                     if (vmIdSet[nodeType].find(vm->id) !=
@@ -650,7 +649,7 @@ public:
 
         for (int nodeType = 0; nodeType < 2; nodeType++) {
             for (auto &pm : aliveMachineList[nodeType]) {
-                if (pm.second->empty()) {
+                if (factory->getServerShadow(pm.first)->empty()) {
                     emptyPMIdList[nodeType].push_back(pm.first);
                     emptyCnt++;
                 } else {
@@ -682,7 +681,7 @@ public:
                                   ableToMigCnt[nodeType] > ignoreMigTimesLimit;
                  pmIndex++) {
                 auto curPMId = emptyPMIdList[nodeType][pmIndex];
-                auto curPM = Server::getServer(curPMId);
+                auto curPM = factory->getServerShadow(curPMId);
                 if (noMoreMig[curPM->category])
                     continue;
 
@@ -705,7 +704,7 @@ public:
                             if (pmPoolIndex < 0) break;
                             curHighExpPMId =
                                     nonEmptyPMIdList[nodeType][pmPoolIndex];
-                            curHighExpPM = Server::getServer(curHighExpPMId);
+                            curHighExpPM = factory->getServerShadow(curHighExpPMId);
                         } while (curHighExpPM->empty() ||
                                  curPM->category != curHighExpPM->category);
 
@@ -721,8 +720,7 @@ public:
                             break;
                         }
                         pmPool.insert(curHighExpPMId);
-                        for (auto &vm : Server::getServer(curHighExpPMId)
-                                ->getAllDeployedVMs()) {
+                        for (auto &vm : curHighExpPM->getAllDeployedVMs()) {
                             vmPool.insert(vm.first->id);
                         }
                         // fprintf(stderr, "pool state %d %d\n",pmPool.size(),
@@ -736,7 +734,7 @@ public:
 
                         for (auto &curVM : vmPool) {
                             if (curPM->canDeployVM(VM::getVM(curVM)) &&
-                                Server::getDeployServer(curVM)->id != curPMId) {
+                                factory->getDeployServer(curVM)->id != curPMId) {
                                 int curRemainResourceWeightedSum =
                                         getRemainResourceWeightedSum(
                                                 curPM, VM::getVM(curVM),
@@ -752,7 +750,7 @@ public:
                         }
 
                         if (canDeployFlag) {
-                            auto outPM = Server::getDeployServer(minVMId);
+                            auto outPM = factory->getDeployServer(minVMId);
                             migCnt++;
                             ableToMigCnt[nodeType]--;
                             vmPool.erase(minVMId);
@@ -769,8 +767,8 @@ public:
                         for (auto &curVM : vmPool) {
                             if (curPM->canDeployVM(VM::getVM(curVM),
                                                    Server::NODE_0) &&
-                                (Server::getDeployServer(curVM)->id != curPMId ||
-                                 Server::getDeployInfo(curVM).second != Server::NODE_0)) {
+                                (factory->getDeployServer(curVM)->id != curPMId ||
+                                 factory->getDeployInfo(curVM).second != Server::NODE_0)) {
                                 int curRemainResourceWeightedSum =
                                         getRemainResourceWeightedSum(
                                                 curPM, VM::getVM(curVM),
@@ -786,8 +784,8 @@ public:
                             }
                             if (curPM->canDeployVM(VM::getVM(curVM),
                                                    Server::NODE_1) &&
-                                (Server::getDeployServer(curVM)->id != curPMId ||
-                                 Server::getDeployInfo(curVM).second != Server::NODE_1)) {
+                                (factory->getDeployServer(curVM)->id != curPMId ||
+                                 factory->getDeployInfo(curVM).second != Server::NODE_1)) {
                                 int curRemainResourceWeightedSum =
                                         getRemainResourceWeightedSum(
                                                 curPM, VM::getVM(curVM),
@@ -804,7 +802,7 @@ public:
                         }
 
                         if (canDeployFlag) {
-                            auto outPM = Server::getDeployServer(minVMId);
+                            auto outPM = factory->getDeployServer(minVMId);
                             migCnt++;
                             ableToMigCnt[nodeType]--;
                             vmPool.erase(minVMId);
@@ -817,7 +815,7 @@ public:
                     std::vector<int> pmNeedDel;
 
                     for (auto &pm : pmPool) {
-                        auto curHighExpPM = Server::getServer(pm);
+                        auto curHighExpPM = factory->getServerShadow(pm);
                         if (curHighExpPM->empty()) {
                             pmNeedDel.push_back(pm);
                         }
@@ -849,13 +847,14 @@ private:
 
     std::unordered_map<int, Server *> *aliveMachineList;
     BinIndexTree treeArray[2];
+    std::shared_ptr<ServerShadowFactory> factory;
 
     int sortPMByRemainAmount(VMType::DeployType deployType,
                              std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [deployType, this](int &pmIdi, int &pmIdj) {
-                      auto pmi = aliveMachineList[deployType][pmIdi];
-                      auto pmj = aliveMachineList[deployType][pmIdj];
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
 
                       return fcmp((pmi->getLeftCPU(Server::NODE_0) +
                                    pmi->getLeftCPU(Server::NODE_1) +
@@ -870,8 +869,7 @@ private:
                   });
         treeArray[deployType].setSize(pmIdList.size());
         for (int i = 1; i <= pmIdList.size(); i++) {
-            Server *pm =
-                    aliveMachineList[deployType][pmIdList[pmIdList.size() - i]];
+            Server *pm = factory->getServerShadow(pmIdList[pmIdList.size() - i]);
             if (deployType == VMType::SINGLE) {
                 treeArray[deployType].update(
                         i, std::make_pair(
@@ -891,8 +889,8 @@ private:
     int sortPMByDailyCost(std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [this](int &pmIdi, int &pmIdj) {
-                      auto pmi = Server::getServer(pmIdi);
-                      auto pmj = Server::getServer(pmIdj);
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
 
                       return (pmi->hardwareCost) * (pmj->energyCost) >
                              (pmi->energyCost) * (pmj->hardwareCost);
@@ -904,8 +902,8 @@ private:
     int sortPMByDailyCostRev(std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [this](int &pmIdi, int &pmIdj) {
-                      auto pmi = Server::getServer(pmIdi);
-                      auto pmj = Server::getServer(pmIdj);
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
 
                       return (pmi->hardwareCost) * (pmj->energyCost) <
                              (pmi->energyCost) * (pmj->hardwareCost);
@@ -917,8 +915,8 @@ private:
     int sortPMByScale(std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [this](int &pmIdi, int &pmIdj) {
-                      auto pmi = Server::getServer(pmIdi);
-                      auto pmj = Server::getServer(pmIdj);
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
 
                       return fcmp((pmi->cpu + (pmi->memory) * MEMORY_PARA) -
                                   (pmj->cpu + (pmj->memory) * MEMORY_PARA)) > 0;
@@ -930,8 +928,8 @@ private:
     int sortPMByScaleRev(std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [this](int &pmIdi, int &pmIdj) {
-                      auto pmi = Server::getServer(pmIdi);
-                      auto pmj = Server::getServer(pmIdj);
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
 
                       return fcmp((pmi->cpu + (pmi->memory) * MEMORY_PARA) -
                                   (pmj->cpu + (pmj->memory) * MEMORY_PARA)) < 0;
@@ -944,8 +942,8 @@ private:
                            std::vector<int> &pmIdList) {
         std::sort(pmIdList.begin(), pmIdList.end(),
                   [deployType, this](int &pmIdi, int &pmIdj) {
-                      auto pmi = aliveMachineList[deployType][pmIdi];
-                      auto pmj = aliveMachineList[deployType][pmIdj];
+                      auto pmi = factory->getServerShadow(pmIdi);
+                      auto pmj = factory->getServerShadow(pmIdj);
                       if (pmi->isHigh != pmj->isHigh) {
                           return pmi->isHigh;
                       }
@@ -1095,23 +1093,22 @@ private:
             }
         }
 
-        auto outPM = aliveMachineList[deployType][outPmID];
+        auto outPM = factory->getServerShadow(outPmID);
         // int curMinimalRemainder = getRemainResourceWeightedSum(outPM, vm,
-        // Server::getDeployInfo(vm->id).second);
+        // factory->getDeployInfo(vm->id).second);
         int curMinimalRemainder = INT32_MAX;
         int minusCnt = 0;
         int findCnt = 0;
 
         if (deployType == VMType::DUAL) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
-                auto curPMId =
-                        static_cast<std::vector<int>::iterator>(&pmIdList[i]);
+                auto curPMId = pmIdList[i];
                 // avoid migrating vm to even lower load machines or to the same
                 // machine
-                if (*curPMId == outPmID)
+                if (curPMId == outPmID)
                     continue;
 
-                auto curPM = aliveMachineList[deployType][*curPMId];
+                auto curPM = factory->getServerShadow(curPMId);
                 // fprintf(stderr,"curpmP %d %d
                 // %d\n",*curPMId,curPM->getLeftCPU(),curPM->getLeftMemory());
                 // avoid startup an empty machine
@@ -1138,8 +1135,9 @@ private:
                         }
                     }
                     */
-                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE,
-                                                        ServerType::DUAL_NODE) < 0) {
+                    if (targetPMId < 0 ||
+                        compareAliveM(curPM, factory->getServerShadow(targetPMId), vm, ServerType::DUAL_NODE,
+                                      ServerType::DUAL_NODE) < 0) {
                         targetPMId = curPM->id;
                         targetType = ServerType::DUAL_NODE;
                         position = i;
@@ -1149,12 +1147,11 @@ private:
             }
         } else if (deployType == VMType::SINGLE) {
             for (int i = pmIdList.size() - 1 - ans; i >= 0; i--) {
-                auto curPMId =
-                        static_cast<std::vector<int>::iterator>(&pmIdList[i]);
+                auto curPMId = pmIdList[i];
                 // avoid migrating vm to even lower load machines or to the same
                 // machine
 
-                auto curPM = aliveMachineList[deployType][*curPMId];
+                auto curPM = factory->getServerShadow(curPMId);
                 // avoid startup an empty machine
                 if (curPM->empty())
                     continue;
@@ -1167,8 +1164,8 @@ private:
                 bool FlagA = false, FlagB = false;
                 if (curPM->canDeployVM(vm, Server::NODE_0)) {
                     if (curPM->getCategory(Server::NODE_0) == vm->category) {
-                        if (*curPMId != outPmID ||
-                            Server::getDeployInfo(vm->id).second !=
+                        if (curPMId != outPmID ||
+                            factory->getDeployInfo(vm->id).second !=
                             Server::NODE_0) {
                             FlagA = true;
                         }
@@ -1177,8 +1174,8 @@ private:
                 }
                 if (curPM->canDeployVM(vm, Server::NODE_1)) {
                     if (curPM->getCategory(Server::NODE_1) == vm->category) {
-                        if (*curPMId != outPmID ||
-                            Server::getDeployInfo(vm->id).second !=
+                        if (curPMId != outPmID ||
+                            factory->getDeployInfo(vm->id).second !=
                             Server::NODE_1) {
                             FlagB = true;
                         }
@@ -1199,7 +1196,7 @@ private:
                         minusCnt++;
                     }
                     /*
-                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::NODE_0, targetType) < 0){
+                    if (targetPMId < 0 || compareAliveM(curPM, factory->getServerShadow(targetPMId), vm, ServerType::NODE_0, targetType) < 0){
                        targetPMId = curPM->id;
                        targetType = Server::NODE_0;
                        position = i;
@@ -1220,7 +1217,7 @@ private:
                         minusCnt++;
                     }
                     /*
-                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::NODE_1, targetType) < 0){
+                    if (targetPMId < 0 || compareAliveM(curPM, factory->getServerShadow(targetPMId), vm, ServerType::NODE_1, targetType) < 0){
                        targetPMId = curPM->id;
                        targetType = Server::NODE_1;
                        position = i;
@@ -1242,10 +1239,10 @@ private:
         // delete in old one
         auto vm = VM::getVM(vmID);
 
-        Server::getServer(outPmID)->remove(vm);
+        factory->getServerShadow(outPmID)->remove(vm);
 
         // add in new one
-        Server::getServer(inPmID)->deploy(vm, node);
+        factory->getServerShadow(inPmID)->deploy(vm, node);
     }
 
     void placeVMShadow(ServerShadowFactory &serSim, int outPmID, int inPmID,
@@ -1271,84 +1268,105 @@ private:
 #endif
     }
 
-    static void applyMigration(ServerShadowFactory *factory) {
+public:
+    static bool applyMigration(const std::shared_ptr<ServerShadowFactory> &_factory,
+                               const std::vector<std::tuple<int, int, Server::DeployNode>> &oldMigrationList,
+                               std::vector<std::tuple<int, int, Server::DeployNode>> &migrationList) {
         // 实现的策略肥肠暴力，有优化空间
+        auto factory = std::make_shared<ServerShadowFactory>();
 
-        std::list<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>> G;
-        auto vmMap = VM::getVMMap();
-        for (auto[vmID, vm] : *vmMap) {
-            auto[_server, _node] = factory->getDeployInfo(vm->id);
-            auto[server, node] = Server::getDeployInfo(vm->id);
+        std::set<int> vmList;
+        for (auto[vmID, serverID, node] : oldMigrationList) {
+            vmList.insert(vmID);
+        }
+
+        std::unordered_map<int, std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>> G;
+        for (auto vmID : vmList) {
+            auto[_server, _node] = _factory->getDeployInfo(vmID);
+            auto[server, node] = factory->getDeployInfo(vmID);
             if (server->id != _server->id || node != _node) {
-                G.emplace_back(vm, server, node, _server, _node);
+                G[vmID] = {VM::getVM(vmID), factory->getServerShadow(server->id), node,
+                           factory->getServerShadow(_server->id), _node};
             }
         }
 
-        Server *s = nullptr;
         auto serverMap = Server::getServerMap();
         std::vector<Server *> emptyServer;
-        for (auto[serverID, server] : *serverMap) {
+        for (auto server : *serverMap) {
+            if (!server) continue;
             if (server->empty()) {
-                emptyServer.push_back(server);
+                emptyServer.push_back(factory->getServerShadow(server->id));
             }
         }
+        if (emptyServer.empty()) return false;
 
         std::sort(emptyServer.begin(), emptyServer.end(), [](Server *a, Server *b) {
             return a->cpu + a->memory > b->cpu + b->memory;
         });
 
-        std::list<std::pair<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>, Server *>> bufferedVM;
+        std::unordered_map<int, std::pair<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>, Server *>> bufferedVM;
         while (!G.empty() || !bufferedVM.empty()) {
             bool flagNoApply = true;
             for (auto it = G.begin(); it != G.end(); it++) {
-                auto[vm, oldServer, oldNode, newServer, newNode] = *it;
+                auto[vm, oldServer, oldNode, newServer, newNode] = it->second;
                 if (newServer->canDeployVM(vm, newNode)) {
                     oldServer->remove(vm);
                     newServer->deploy(vm, newNode);
+                    migrationList.emplace_back(vm->id, newServer->id, newNode);
                     it = G.erase(it);
                     flagNoApply = false;
+                    if (it == G.end()) break;
                 }
             }
             for (auto it = bufferedVM.begin(); it != bufferedVM.end(); it++) {
-                auto[vm, oldServer, oldNode, newServer, newNode] = it->first;
+                auto[vm, oldServer, oldNode, newServer, newNode] = it->second.first;
                 if (newServer->canDeployVM(vm, newNode)) {
-                    it->second->remove(vm);
+                    it->second.second->remove(vm);
                     newServer->deploy(vm, newNode);
+                    migrationList.emplace_back(vm->id, newServer->id, newNode);
                     it = bufferedVM.erase(it);
                     flagNoApply = false;
+                    if (it == bufferedVM.end()) break;
                 }
             }
 
             if (flagNoApply) {
-                if (G.empty()) break; // 所有bufferedVM里的VM都没法动，其他的都做完了
-                auto info = *G.begin();
+                if (G.empty()) return false; // 所有bufferedVM里的VM都没法动，其他的都做完了
+                auto info = G.begin()->second;
                 auto[vm, oldServer, oldNode, newServer, newNode] = info;
                 G.erase(G.begin());
                 bool flagNoEmptyServer = true;
                 for (auto server : emptyServer) {
                     if (vm->deployType == VM::DUAL) {
                         if (server->canDeployVM(vm)) {
+                            oldServer->remove(vm);
                             server->deploy(vm);
-                            bufferedVM.emplace_back(info, server);
+                            bufferedVM[vm->id] = {info, server};
+                            migrationList.emplace_back(vm->id, server->id, Server::DUAL_NODE);
                             flagNoEmptyServer = false;
                             break;
                         }
                     } else {
                         if (server->canDeployVM(vm, Server::NODE_0)) {
+                            oldServer->remove(vm);
                             server->deploy(vm, Server::NODE_0);
-                            bufferedVM.emplace_back(info, server);
+                            bufferedVM[vm->id] = {info, server};
+                            migrationList.emplace_back(vm->id, server->id, Server::NODE_0);
                             flagNoEmptyServer = false;
                             break;
                         } else if (server->canDeployVM(vm, Server::NODE_1)) {
+                            oldServer->remove(vm);
                             server->deploy(vm, Server::NODE_1);
-                            bufferedVM.emplace_back(info, server);
+                            bufferedVM[vm->id] = {info, server};
+                            migrationList.emplace_back(vm->id, server->id, Server::NODE_1);
                             flagNoEmptyServer = false;
                             break;
                         }
                     }
                 }
-                if (flagNoEmptyServer) break; // 没有空余机器能用来装移不动的VM
+                if (flagNoEmptyServer) return false; // 没有空余机器能用来装移不动的VM
             }
         }
+        return true;
     }
 };
