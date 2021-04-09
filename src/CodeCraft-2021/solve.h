@@ -128,7 +128,7 @@ public:
         auto dayCount = io->readDayCount();
         T = dayCount.first;
         // 预先读进来K天
-        int K = dayCount.second;
+        K = dayCount.second;
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
@@ -168,7 +168,7 @@ public:
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.03);
                 lastDayLeftMigCnt = limit;
             }
 
@@ -188,7 +188,9 @@ public:
             vmDieInK.clear();
             vmAddRecordInK.clear();
 
-            for(int i=0;i<K;i++){
+            const int kBest = 15;
+
+            for(int i=0; i<std::min(K, kBest); i++){
                 calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
             }
 
@@ -279,15 +281,18 @@ public:
 
         std::clog << "Total Cost: " << totalCost << std::endl;
         std::clog << "HardWare Cost: " << hardwareCost << std::endl;
+        std::clog << "Test Cnt:  " << testCnt << std::endl;
 #endif
     }
 
 private:
     int T;
     int day; // 为了方便我使用时间
+    int K;
     bool isPeak = false;
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
+    int testCnt = 0;
     std::vector<std::vector<Query *>> queryListK;
     std::unordered_map<int, std::pair<bool,int> > vmAddRecord;
     std::unordered_map<int, int> vmAddRecordInK;
@@ -302,15 +307,41 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
-    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
+    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 4;
 
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
     static constexpr int PEAK_MEM = 30000;
 
+    // 用于判断是不是大机器
+    static constexpr int LARGE_MACHINE_SINGLE = 80;
+    static constexpr int LARGE_MACHINE_DUAL = 80;
+
 
     static bool compareAddQuery(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
         auto vmA = a.first, vmB = b.first;
+        if(vmA->deployType == VM::SINGLE) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE && vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return 0;
+            }
+        }
+        if(vmA->deployType == VM::DUAL) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL && vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return 0;
+            }
+        }
         if (vmA->category != vmB->category) {
             return vmA->category < vmB->category;
         }
@@ -481,8 +512,41 @@ private:
 #ifdef DEBUG_O3
 //                    std::clog << "type 1 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
 //                    std::clog << minAlivm->toString() << std::endl;
-#endif
-                    minAlivm->deploy(vm, Server::DUAL_NODE);
+#endif      
+                    if(minAlivm->getCategory(Server::DUAL_NODE) != vm->category) {
+                        // if(minAlivm->getCategory(Server::DUAL_NODE) % 2 == vm->category % 2){
+                            // calcMachineResource();
+                            // if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]
+                            // && dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineMemInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]) {
+                            //     if(vm->cpu + vm->memory > 80 && !isPeak) {
+                            //         // canLocateFlag = false;
+                            //         testCnt++; 
+                            //     }
+                            //     // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)], machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]);
+                                
+                            //     // int tmp = rand() % 10;
+                            //     // if(tmp < 2) 
+                            //     // canLocateFlag = false;
+                            // }
+                        // }
+
+                          
+                    } 
+                    if(canLocateFlag){
+                        
+                        #ifdef TEST
+                            int resetCPU = minAlivm->getLeftCPU() - vm->cpu;
+                            int resetMem = minAlivm->getLeftMemory() - vm->memory;
+                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(), minAlivm->getLeftMemory(), 
+                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU() + 0.0) /  minAlivm->getLeftMemory(), (resetCPU + 0.0) / resetMem);
+                            
+                        #endif
+                        minAlivm->deploy(vm, Server::DUAL_NODE);
+                        
+                        dailyMaxCPUInPerType[vm->deployType][vm->category] -= vm->cpu;
+                        dailyMaxMemInPerType[vm->deployType][vm->category] -= vm->memory;
+                    }
+                    
                 }
 
             } else {
@@ -512,7 +576,42 @@ private:
 //                    std::clog << "type 2 vm " << vm->id << " deployed at server " << minAlivm->id << std::endl;
 //                    std::clog << minAlivm->toString() << std::endl;
 #endif
-                    minAlivm->deploy(vm, lastType);
+                    
+                    if(minAlivm->getCategory(lastType) != vm->category) {
+                        // if(minAlivm->getCategory(lastType) % 2 == vm->category % 2){
+                    
+                            // calcMachineResource();
+                            // if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)] &&
+                            //     dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineMemInType[vm->deployType][minAlivm->getCategory(lastType)]) {
+                            //     // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)], machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)]);
+                                
+                            //     if(vm->cpu + vm->memory > 80 && !isPeak) {
+                            //         testCnt++; 
+                            //         // canLocateFlag = false;
+                            //     }
+                            //     // int tmp = rand() % 10;
+                            //     // if(tmp < 2) 
+                            //     // canLocateFlag = false;
+                            //     // canLocateFlag = false;
+                            // }
+                        // }
+
+                        
+                    }
+                        // testCnt++;
+                    
+                    if(canLocateFlag) {
+                        #ifdef TEST
+                            int resetCPU = minAlivm->getLeftCPU(lastType) - vm->cpu;
+                            int resetMem = minAlivm->getLeftMemory(lastType) - vm->memory;
+                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(lastType), minAlivm->getLeftMemory(lastType), 
+                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU(lastType) + 0.0) /  minAlivm->getLeftMemory(lastType), (resetCPU + 0.0) / resetMem);
+                            
+                        #endif
+                        minAlivm->deploy(vm, lastType);
+                        dailyMaxCPUInPerType[vm->deployType][vm->category] -= vm->cpu;
+                        dailyMaxMemInPerType[vm->deployType][vm->category] -= vm->memory;
+                    }
                 }
             }
 
@@ -564,7 +663,10 @@ private:
 
                 if(!canSteal) {
                     ServerType *m;
-                    if (isPeak && /*vmDieInK.find(vm->id) != vmDieInK.end() &&*/ rand() < RAND_MAX*0.2){
+                    const int kMinimumLimit = 10;
+                    const double highRate = 0.2;
+
+                    if (isPeak && ((vmDieInK.find(vm->id) != vmDieInK.end() && K > kMinimumLimit)||(K <= kMinimumLimit && rand() < RAND_MAX*highRate))){
                         for (auto &am : findHighExpPMTypeList[vm->category]) {
                             if (am->canDeployVM(vm)) {
                                 m = am;
@@ -576,6 +678,9 @@ private:
                     }else{
                         for (auto &am : machineListForSort[vm->category]) {
                             //if (am->cpu > 400 && am->memory > 400) continue;
+                            // if(vm->deployType == VM::SINGLE && vm->category == Category::SAME_LARGE) {
+                            //     if(am->memory < 300 && am->cpu < 600) continue;
+                            // }
                             if (am->canDeployVM(vm)) {
                                 m = am;
                                 break;
@@ -593,17 +698,44 @@ private:
                 }
                 if (vm->deployType == VMType::DUAL) {
                     if (aliveM->canDeployVM(vm)) {
+                        #ifdef TEST
+                            int resetCPU = aliveM->getLeftCPU() - vm->cpu;
+                            int resetMem = aliveM->getLeftMemory() - vm->memory;
+                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(), aliveM->getLeftMemory(), 
+                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU() + 0.0) /  aliveM->getLeftMemory(), (resetCPU + 0.0) / resetMem);
+                            
+                        #endif
                         aliveM->deploy(vm);
+                        dailyMaxCPUInPerType[vm->deployType][vm->category] -= vm->cpu;
+                        dailyMaxMemInPerType[vm->deployType][vm->category] -= vm->memory;
                         canLocateFlag = true;
                     }
                 } else {
                     int flagA = aliveM->canDeployVM(vm, Server::NODE_0);
                     int flagB = aliveM->canDeployVM(vm, Server::NODE_1);
                     if (flagA) {
+                        #ifdef TEST
+                            int resetCPU = aliveM->getLeftCPU(Server::NODE_0) - vm->cpu;
+                            int resetMem = aliveM->getLeftMemory(Server::NODE_0) - vm->memory;
+                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_0), aliveM->getLeftMemory(Server::NODE_0), 
+                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_0) + 0.0) /  aliveM->getLeftMemory(Server::NODE_0), (resetCPU + 0.0) / resetMem);
+                            
+                        #endif
                         aliveM->deploy(vm, Server::NODE_0);
+                        dailyMaxCPUInPerType[vm->deployType][vm->category] -= vm->cpu;
+                        dailyMaxMemInPerType[vm->deployType][vm->category] -= vm->memory;
                         canLocateFlag = true;
                     } else if (flagB) {
+                        #ifdef TEST
+                            int resetCPU = aliveM->getLeftCPU(Server::NODE_1) - vm->cpu;
+                            int resetMem = aliveM->getLeftMemory(Server::NODE_1) - vm->memory;
+                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_1), aliveM->getLeftMemory(Server::NODE_1), 
+                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_1) + 0.0) /  aliveM->getLeftMemory(Server::NODE_1), (resetCPU + 0.0) / resetMem);
+                            
+                        #endif
                         aliveM->deploy(vm, Server::NODE_1);
+                        dailyMaxCPUInPerType[vm->deployType][vm->category] -= vm->cpu;
+                        dailyMaxMemInPerType[vm->deployType][vm->category] -= vm->memory;
                         canLocateFlag = true;
                     }
                 }
@@ -785,6 +917,37 @@ private:
             }
             return 1;
         }
+    }
+
+    int machineCPUInType[2][5] = {0};
+    int machineMemInType[2][5] = {0};
+
+    void calcMachineResource() {
+        memset(machineCPUInType, 0, sizeof(machineCPUInType));
+        memset(machineMemInType, 0, sizeof(machineMemInType));
+        for(int i = 0;i < 2;i ++) {
+            for(auto [id, aliveM] : aliveMachineList[i]) {
+                if(i == 0) {
+                    machineCPUInType[i][aliveM->getCategory(Server::NODE_0)] += aliveM->getLeftCPU(Server::NODE_0);
+                    machineCPUInType[i][aliveM->getCategory(Server::NODE_1)] += aliveM->getLeftCPU(Server::NODE_1);
+                    machineMemInType[i][aliveM->getCategory(Server::NODE_0)] += aliveM->getLeftMemory(Server::NODE_0);
+                    machineMemInType[i][aliveM->getCategory(Server::NODE_1)] += aliveM->getLeftMemory(Server::NODE_1);
+                } else {
+                    machineCPUInType[i][aliveM->getCategory(Server::DUAL_NODE)] += aliveM->getLeftCPU();
+                    // machineCPUInType[i][aliveM->getCategory(Server::NODE_1)] += aliveM->getLeftCPU(Server::NODE_1);
+                    machineMemInType[i][aliveM->getCategory(Server::DUAL_NODE)] += aliveM->getLeftMemory();
+                    // machineMemInType[i][aliveM->getCategory(Server::NODE_1)] += aliveM->getLeftMemory(Server::NODE_0);
+                }
+            }
+            
+        }
+        // for(int i = 0;i < 2;i ++) {
+        //     for(int j = 1;j <= 4;j ++) {
+        //         if(j == 3) continue;
+        //         fprintf(stderr, "%d %d ", machineCPUInType[i][j], machineMemInType[i][j]);
+        //     }
+        //     fprintf(stderr, "\n");
+        // }
     }
 
     void checkUsedRate() {

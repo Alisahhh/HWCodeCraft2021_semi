@@ -18,7 +18,7 @@ if (CMAKE_BUILD_TYPE STREQUAL debug)
     add_definitions(-DTEST)
 endif ()
 
-SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -march=native -O0 -g -ggdb -std=c++17")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -march=native -O3 -g -ggdb -std=c++17")
 SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -march=native -O3  -std=c++17")
 
 # 查找当前目录下的所有源文件
