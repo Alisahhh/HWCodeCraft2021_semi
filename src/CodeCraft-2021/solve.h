@@ -168,7 +168,7 @@ public:
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.03);
                 lastDayLeftMigCnt = limit;
             }
 
@@ -307,23 +307,40 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
-    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 2.2;
+    static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 4;
 
     // 用于判断是不是峰值
     static constexpr int PEAK_CPU = 30000;
     static constexpr int PEAK_MEM = 30000;
 
+    // 用于判断是不是大机器
+    static constexpr int LARGE_MACHINE_SINGLE = 80;
+    static constexpr int LARGE_MACHINE_DUAL = 80;
+
 
     static bool compareAddQuery(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
         auto vmA = a.first, vmB = b.first;
-        if(vmA->cpu + vmA->memory > 60 && vmB->cpu + vmB->memory > 60) {
-            return vmA->category < vmB->category;
+        if(vmA->deployType == VM::SINGLE) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE && vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return 0;
+            }
         }
-        if(vmA->cpu + vmA->memory > 60) {
-            return 1;
-        }
-        if(vmB->cpu + vmB->memory > 60) {
-            return 0;
+        if(vmA->deployType == VM::DUAL) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL && vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return 0;
+            }
         }
         if (vmA->category != vmB->category) {
             return vmA->category < vmB->category;
@@ -498,15 +515,19 @@ private:
 #endif      
                     if(minAlivm->getCategory(Server::DUAL_NODE) != vm->category) {
                         // if(minAlivm->getCategory(Server::DUAL_NODE) % 2 == vm->category % 2){
-                            calcMachineResource();
-                            if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]
-                            && dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineMemInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]) {
-                                // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)], machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]);
-                                testCnt++; 
-                                // int tmp = rand() % 10;
-                                // if(tmp < 2) 
-                                // canLocateFlag = false;
-                            }
+                            // calcMachineResource();
+                            // if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]
+                            // && dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)] >= machineMemInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]) {
+                            //     if(vm->cpu + vm->memory > 80 && !isPeak) {
+                            //         // canLocateFlag = false;
+                            //         testCnt++; 
+                            //     }
+                            //     // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)], machineCPUInType[vm->deployType][minAlivm->getCategory(Server::DUAL_NODE)]);
+                                
+                            //     // int tmp = rand() % 10;
+                            //     // if(tmp < 2) 
+                            //     // canLocateFlag = false;
+                            // }
                         // }
 
                           
@@ -559,16 +580,20 @@ private:
                     if(minAlivm->getCategory(lastType) != vm->category) {
                         // if(minAlivm->getCategory(lastType) % 2 == vm->category % 2){
                     
-                            calcMachineResource();
-                            if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)] &&
-                                dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineMemInType[vm->deployType][minAlivm->getCategory(lastType)]) {
-                                // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)], machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)]);
-                                testCnt++; 
-                                // int tmp = rand() % 10;
-                                // if(tmp < 2) 
-                                // canLocateFlag = false;
-                                // canLocateFlag = false;
-                            }
+                            // calcMachineResource();
+                            // if(dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)] &&
+                            //     dailyMaxMemInPerType[vm->deployType][minAlivm->getCategory(lastType)] >= machineMemInType[vm->deployType][minAlivm->getCategory(lastType)]) {
+                            //     // fprintf(stderr, "%d %d\n", dailyMaxCPUInPerType[vm->deployType][minAlivm->getCategory(lastType)], machineCPUInType[vm->deployType][minAlivm->getCategory(lastType)]);
+                                
+                            //     if(vm->cpu + vm->memory > 80 && !isPeak) {
+                            //         testCnt++; 
+                            //         // canLocateFlag = false;
+                            //     }
+                            //     // int tmp = rand() % 10;
+                            //     // if(tmp < 2) 
+                            //     // canLocateFlag = false;
+                            //     // canLocateFlag = false;
+                            // }
                         // }
 
                         
@@ -653,6 +678,9 @@ private:
                     }else{
                         for (auto &am : machineListForSort[vm->category]) {
                             //if (am->cpu > 400 && am->memory > 400) continue;
+                            // if(vm->deployType == VM::SINGLE && vm->category == Category::SAME_LARGE) {
+                            //     if(am->memory < 300 && am->cpu < 600) continue;
+                            // }
                             if (am->canDeployVM(vm)) {
                                 m = am;
                                 break;
