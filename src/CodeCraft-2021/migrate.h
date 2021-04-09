@@ -946,9 +946,9 @@ private:
                   [deployType, this](int &pmIdi, int &pmIdj) {
                       auto pmi = aliveMachineList[deployType][pmIdi];
                       auto pmj = aliveMachineList[deployType][pmIdj];
-                        if(pmi->isHigh != pmj->isHigh){
-                            return pmi->isHigh;
-                        }
+                      if (pmi->isHigh != pmj->isHigh) {
+                          return pmi->isHigh;
+                      }
 
                       return fcmp((pmi->cpu - pmi->getLeftCPU() +
                                    (pmi->memory - pmi->getLeftMemory()) *
@@ -1120,7 +1120,7 @@ private:
 
                 int remainResourceWeightedSum = INT32_MAX;
                 if (curPM->canDeployVM(vm)) {
-                    if (curPM->isHigh && !outPM->isHigh){
+                    if (curPM->isHigh && !outPM->isHigh) {
                         continue;
                     }
                     /*
@@ -1158,7 +1158,7 @@ private:
                 // avoid startup an empty machine
                 if (curPM->empty())
                     continue;
-                if (curPM->isHigh && !outPM->isHigh){
+                if (curPM->isHigh && !outPM->isHigh) {
                     continue;
                 }
 
@@ -1272,6 +1272,8 @@ private:
     }
 
     static void applyMigration(ServerShadowFactory *factory) {
+        // 实现的策略肥肠暴力，有优化空间
+
         std::list<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>> G;
         auto vmMap = VM::getVMMap();
         for (auto[vmID, vm] : *vmMap) {
@@ -1295,19 +1297,57 @@ private:
             return a->cpu + a->memory > b->cpu + b->memory;
         });
 
-//        std::unordered_map<VM *, Server *>
-        while (!G.empty()) {
+        std::list<std::pair<std::tuple<VM *, Server *, Server::DeployNode, Server *, Server::DeployNode>, Server *>> bufferedVM;
+        while (!G.empty() || !bufferedVM.empty()) {
             bool flagNoApply = true;
-            for (auto[vm, oldServer, oldNode, newServer, newNode] : G) {
+            for (auto it = G.begin(); it != G.end(); it++) {
+                auto[vm, oldServer, oldNode, newServer, newNode] = *it;
                 if (newServer->canDeployVM(vm, newNode)) {
                     oldServer->remove(vm);
                     newServer->deploy(vm, newNode);
+                    it = G.erase(it);
+                    flagNoApply = false;
+                }
+            }
+            for (auto it = bufferedVM.begin(); it != bufferedVM.end(); it++) {
+                auto[vm, oldServer, oldNode, newServer, newNode] = it->first;
+                if (newServer->canDeployVM(vm, newNode)) {
+                    it->second->remove(vm);
+                    newServer->deploy(vm, newNode);
+                    it = bufferedVM.erase(it);
                     flagNoApply = false;
                 }
             }
 
             if (flagNoApply) {
-
+                if (G.empty()) break; // 所有bufferedVM里的VM都没法动，其他的都做完了
+                auto info = *G.begin();
+                auto[vm, oldServer, oldNode, newServer, newNode] = info;
+                G.erase(G.begin());
+                bool flagNoEmptyServer = true;
+                for (auto server : emptyServer) {
+                    if (vm->deployType == VM::DUAL) {
+                        if (server->canDeployVM(vm)) {
+                            server->deploy(vm);
+                            bufferedVM.emplace_back(info, server);
+                            flagNoEmptyServer = false;
+                            break;
+                        }
+                    } else {
+                        if (server->canDeployVM(vm, Server::NODE_0)) {
+                            server->deploy(vm, Server::NODE_0);
+                            bufferedVM.emplace_back(info, server);
+                            flagNoEmptyServer = false;
+                            break;
+                        } else if (server->canDeployVM(vm, Server::NODE_1)) {
+                            server->deploy(vm, Server::NODE_1);
+                            bufferedVM.emplace_back(info, server);
+                            flagNoEmptyServer = false;
+                            break;
+                        }
+                    }
+                }
+                if (flagNoEmptyServer) break; // 没有空余机器能用来装移不动的VM
             }
         }
     }
