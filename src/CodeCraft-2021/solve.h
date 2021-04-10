@@ -98,6 +98,7 @@ public:
         fprintf(stderr,"%s %s %s\n", findHighExpPMTypeList[MORE_MEMORY][0]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][1]->model.c_str(), findHighExpPMTypeList[MORE_MEMORY][2]->model.c_str());
 #endif
 
+#define TEST_KMEANS
 #ifdef TEST_KMEANS
         auto *kMeans = new KMeans<ServerType *>;
         std::vector<std::pair<std::vector<double>, ServerType *>> testData;
@@ -106,11 +107,11 @@ public:
         }
         auto kMeansResultTmp = kMeans->kMeans(testData);
         delete kMeans;
-        std::vector<std::vector<ServerType *>> kMeansResult;
+        std::vector<std::set<ServerType *>> kMeansResult;
         for (auto &i : kMeansResultTmp) {
-            std::vector<ServerType *> tmp;
+            std::set<ServerType *> tmp;
             for (auto &obj : i) {
-                tmp.push_back(obj.second);
+                tmp.insert(obj.second);
             }
             kMeansResult.push_back(tmp);
         }
@@ -132,6 +133,75 @@ public:
 #ifdef TEST
         std::clog << "T " << T << " K " << K << std::endl;
 #endif
+
+#ifdef TEST_KMEANS
+        std::vector<std::pair<double, double>> kMeansSepareteCost;
+        for (auto &kmr:kMeansResult){
+            volatile double sumHardwareCost = 0;
+            volatile double sumEnergeyCost = 0;
+
+            for (auto &sT:kmr){
+                sumHardwareCost += (double)sT->hardwareCost / (double)(sT->cpu + sT->memory*0.45);
+                sumEnergeyCost += (double)sT->energyCost / (double)(sT->cpu + sT->memory*0.45);
+            }
+
+            kMeansSepareteCost.push_back(std::make_pair(sumHardwareCost/kmr.size(), sumEnergeyCost/kmr.size()));
+        }
+
+        std::vector<double> catPMCostInDaySim(kMeansSepareteCost.size(), -1);
+        std::vector<int> bestPMInDay(T+1, -1);
+
+        for (int i=0;i<catPMCostInDaySim.size();i++){
+            if (catPMCostInDaySim.size() != kMeansSepareteCost.size()) throw error_t(-1);
+            catPMCostInDaySim[i] = kMeansSepareteCost[i].first;
+        }
+
+        // for the T Day
+        int minimumCostCat = 0;
+        double minimumCost = catPMCostInDaySim[0];
+        for(int i=0;i<catPMCostInDaySim.size();i++){
+            if (fcmp(catPMCostInDaySim[i] - minimumCost) < 0){
+                minimumCost = catPMCostInDaySim[i];
+                minimumCostCat = i;
+            }
+        }
+        bestPMInDay[T] = minimumCostCat;
+        int bestCatInEnd = minimumCostCat;
+        int highExpDay = -1;
+        // fprintf(stderr, "%d\n", minimumCostCat);
+
+        const double pmRunRate = 1.05;
+        // for init day to T-1 day
+        for (int simToday = T-1; simToday > 0; simToday--){
+            // update total cost, if pm added in simToday day
+            for (int i=0;i<catPMCostInDaySim.size();i++){
+                catPMCostInDaySim[i] += pmRunRate * kMeansSepareteCost[i].second;
+                // fprintf(stderr, "%lf\t",catPMCostInDaySim[i]);
+            }
+            // fprintf(stderr, "\n");
+            int minimumCostCat = -1;
+            int minimumCost = INT32_MAX;
+            for (int i=0;i<catPMCostInDaySim.size();i++){
+                if (fcmp(catPMCostInDaySim[i] - minimumCost) < 0){
+                    minimumCost = catPMCostInDaySim[i];
+                    minimumCostCat = i;
+                }
+            }
+            bestPMInDay[simToday] = minimumCostCat;
+            // fprintf(stderr, "%d %d\n", minimumCostCat, bestCatInEnd);
+            if (minimumCostCat != bestCatInEnd && highExpDay == -1) {
+                highExpDay = simToday;
+            }
+        }
+#endif
+
+#ifdef TEST
+        for (auto &kmc : kMeansSepareteCost) {
+            fprintf(stderr, "%lf %lf\n", kmc.first, kmc.second);
+        }
+        fprintf(stderr, "highExpDay %d\n", highExpDay);
+#endif
+
         queryListK.resize(K);
         for (int i = 1; i <= K; i++) {
 #ifdef TEST
@@ -191,6 +261,7 @@ public:
             const int kBest = 15;
 
             for(int i=0; i<std::min(K, kBest); i++){
+                if (day + i > T) continue;
                 calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
             }
 
@@ -211,7 +282,7 @@ public:
                     (query->type == Query::Type::DEL || query->id == (*queryList.rbegin())->id)) {
                     for (auto &addQueryList : addQueryLists) {
                         std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
-                        handleAddQueries(addQueryList, purchaseList);
+                        handleAddQueries(addQueryList, purchaseList, highExpDay);
                     }
 
                     // IO
@@ -360,10 +431,10 @@ private:
     std::unordered_map<int, Server *> aliveMachineList[2];
 
     void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
-                          std::vector<Server *> &purchaseList) {
+                          std::vector<Server *> &purchaseList, const int highExpDay) {
         if(addQueryList.size() == 0) return;
         bool canLocateFlag = false;
-        const int highExpDay = 350;
+        //const int highExpDay = 350;
 
         calcQueryListResource(addQueryList);
         volatile double param = 1.6;
@@ -371,7 +442,7 @@ private:
         auto deployType = addQueryList[0].first->deployType;
         if(dailyMaxMemInPerType[deployType][1] != 0)
         std::sort(machineListForSort[1].begin(), machineListForSort[1].end(), 
-        [param, deployType, this](ServerType *a, ServerType *b) {
+        [highExpDay, param, deployType, this](ServerType *a, ServerType *b) {
             volatile double k = (dailyMaxCPUInPerType[deployType][1] + 0.0)/
                                 dailyMaxMemInPerType[deployType][1];
             volatile double k1 = (a->cpu + 0.0) / a->memory;
@@ -418,7 +489,7 @@ private:
 
         if(dailyMaxMemInPerType[deployType][2] != 0) 
         std::sort(machineListForSort[2].begin(), machineListForSort[2].end(), 
-        [param, deployType, this](ServerType *a, ServerType *b) {
+        [highExpDay, param, deployType, this](ServerType *a, ServerType *b) {
             volatile double k = (dailyMaxCPUInPerType[deployType][2] + 0.0)/
                                 dailyMaxMemInPerType[deployType][2];
             volatile double k1 = (a->cpu + 0.0)/ a->memory;
@@ -455,7 +526,7 @@ private:
 
         if(dailyMaxMemInPerType[deployType][4] != 0) 
         std::sort(machineListForSort[4].begin(), machineListForSort[4].end(), 
-        [param, deployType, this](ServerType *a, ServerType *b) {
+        [highExpDay, param, deployType, this](ServerType *a, ServerType *b) {
             volatile double k = (dailyMaxCPUInPerType[deployType][4] + 0.0)/
                                 dailyMaxMemInPerType[deployType][4];
             volatile double k1 = (a->cpu + 0.0)/ a->memory;
