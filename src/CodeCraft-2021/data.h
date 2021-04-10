@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <vector>
 
+// FIXME:
+const int pmCatHERateSpace = 6;
 const double EPS = 1e-12;
 
 inline int fcmp(double a) {
@@ -26,8 +28,10 @@ inline int fcmp(double a) {
 //   SAME_LARGE_THR: CPU 与内存均高于此值分类为 SAME_LARGE
 //   其余服务器分类为 SAME_SMALL
 
+// FIXME:
 const double MORE_CPU_RATIO = 2.2,
         MORE_MEMORY_RATIO = 1 / 2.2;
+// TODO:
 const int SAME_LARGE_THR = 300;
 
 enum Category : int {

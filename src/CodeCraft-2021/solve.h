@@ -47,8 +47,8 @@ public:
                 }
                 return a->category < b->category;
             } else {
-                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
-                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                 if(aK == bK) {
                     return fcmp(std::abs(1.0 - (double)a->cpu / (double)a->memory) - std::abs(1.0 - (double)b->cpu / (double)b->memory)) < 0;
                 } else {
@@ -71,8 +71,8 @@ public:
                 }
                 return a->category < b->category;
             } else {
-                int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
-                int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+                int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                 if(aK == bK) {
                     return fcmp(std::abs(3.0 - (double)a->cpu / (double)a->memory) - std::abs(3.0 - (double)b->cpu / (double)b->memory)) < 0;
                 } else {
@@ -86,8 +86,8 @@ public:
 
         param = MORE_MEMORY;
         std::sort(findHighExpPMTypeList[MORE_MEMORY].begin(), findHighExpPMTypeList[MORE_MEMORY].end(), [param, this](ServerType *a, ServerType *b) {
-            int aK = ((a->hardwareCost) / (a->energyCost)) >> 6;
-            int bK = ((b->hardwareCost) / (b->energyCost)) >> 6;
+            int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+            int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
             if(aK == bK) {
                 return fcmp(std::abs(0.5 - (double)a->cpu / (double)a->memory) - std::abs(0.5 - (double)b->cpu / (double)b->memory)) < 0;
             } else {
@@ -236,8 +236,11 @@ public:
                 // limit = INT32_MAX;
                 //limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
+                // FIXME:
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.2);
-                limit -= migrator->combineLowLoadRatePM(day, limit, migrationList);
+                // FIXME:
+                limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.3);
+                // FIXME:
                 limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.03);
                 lastDayLeftMigCnt = limit;
             }
@@ -378,13 +381,16 @@ private:
 
     // **参数说明**
     // 用于 compareAddQuery 对新增虚拟机请求排序的参数
+    // FIXME:
     static constexpr double COMPARE_ADD_QUERY_RATIO = 1 / 4;
 
     // 用于判断是不是峰值
+    // FIXME:
     static constexpr int PEAK_CPU = 30000;
     static constexpr int PEAK_MEM = 30000;
 
     // 用于判断是不是大机器
+    // TODO:
     static constexpr int LARGE_MACHINE_SINGLE = 80;
     static constexpr int LARGE_MACHINE_DUAL = 80;
 
@@ -437,6 +443,7 @@ private:
         //const int highExpDay = 350;
 
         calcQueryListResource(addQueryList);
+        // FIXME:
         volatile double param = 1.6;
         if (isPeak) param = 1.0;
         auto deployType = addQueryList[0].first->deployType;
@@ -471,8 +478,8 @@ private:
                         }
                     }
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {
@@ -508,8 +515,8 @@ private:
             } else {
                 if (fcmp(absKa - 20) < 0 && fcmp(absKb - 20) < 0) {
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {
@@ -545,8 +552,8 @@ private:
             } else {
                 if (fcmp(absKa - 1) < 0 && fcmp(absKb - 1) < 0) {
                     if(day > highExpDay) {
-                        int aK = ((a->hardwareCost) / (a->energyCost)) >> 5;
-                        int bK = ((b->hardwareCost) / (b->energyCost)) >> 5;
+                        int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                         if(aK == bK) {
                             return a->hardwareCost < b->hardwareCost;
                         } else {

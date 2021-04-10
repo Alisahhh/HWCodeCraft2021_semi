@@ -665,6 +665,7 @@ class Migrator {
         int ableToMigCnt[2] = {(limit * (int)emptyPMIdList[0].size()) / emptyCnt,
                                (limit * (int)emptyPMIdList[1].size()) / emptyCnt};
         int migCnt = 0;
+        // not used
         const int pmPoolLimit = 5;
         const int ignoreMigTimesLimit = 10;
 
@@ -709,8 +710,8 @@ class Migrator {
                             break;
                         }
 
-                        if (((curHighExpPM->hardwareCost / curHighExpPM->energyCost) >> 5) >=
-                            ((curPM->hardwareCost / curPM->energyCost) >> 5)) {
+                        if (((curHighExpPM->hardwareCost / curHighExpPM->energyCost) >> pmCatHERateSpace) >=
+                            ((curPM->hardwareCost / curPM->energyCost) >> pmCatHERateSpace)) {
                             // fprintf(stderr, "no more ECR diff\n");
                             noMoreMig[curPM->category] = true;
                             break;
@@ -833,7 +834,9 @@ class Migrator {
   private:
     // **参数说明**
     // 对服务器资源排序时内存数值的系数
+    // TODO:
     volatile const double MEMORY_PARA = 0.47;
+    // FIXME:
     volatile const double FIND_PM_REMAIN_MEMORY_WRIGHT[5] = {0.55, 0.55, 0.55, 0.55,
                                                              0.55};
     volatile const double FIND_PM_REMAIN_CPU_WRIGHT[5] = {1, 1, 1, 1, 1};
@@ -1116,6 +1119,7 @@ class Migrator {
                     if (curPM->isHigh && !outPM->isHigh){
                         continue;
                     }
+                    // FIXME:
                     /*
                     if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum =
@@ -1183,6 +1187,7 @@ class Migrator {
                     
                     remainResourceWeightedSum =
                         getRemainResourceWeightedSum(curPM, vm, Server::NODE_0);
+                    // FIXME:
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_0;
@@ -1204,6 +1209,7 @@ class Migrator {
                     
                     remainResourceWeightedSum =
                         getRemainResourceWeightedSum(curPM, vm, Server::NODE_1);
+                    // FIXME:
                     if (remainResourceWeightedSum < curMinimalRemainder) {
                         targetPMId = curPM->id;
                         targetType = Server::NODE_1;
