@@ -1275,7 +1275,7 @@ public:
         // 实现的策略肥肠暴力，有优化空间
         auto factory = std::make_shared<ServerShadowFactory>();
 
-        std::set<int> vmList;
+        std::unordered_set<int> vmList;
         for (auto[vmID, serverID, node] : oldMigrationList) {
             vmList.insert(vmID);
         }

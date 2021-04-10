@@ -7,8 +7,9 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
-#include <stdlib.h>
+#include <cstdlib>
 #include <memory>
+#include <cassert>
 
 #include "data.h"
 #include "io.h"
@@ -168,7 +169,8 @@ public:
                 // limit = INT32_MAX;
                 //limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
-                while (true) {
+                int tmpC = 1;
+                while (tmpC--) {
                     int _limit = limit + limitDiff;
                     auto migratorFactory = std::make_shared<ServerShadowFactory>();
                     auto migrator = std::make_shared<Migrator>(aliveMachineList, migratorFactory);
@@ -176,12 +178,18 @@ public:
                     _limit -= migrator->migrateScatteredVM(day, _limit, migratorList, 0.2);
                     _limit -= migrator->combineLowLoadRatePM(day, _limit, migratorList);
                     _limit -= migrator->migrateScatteredVM(day, _limit, migratorList, 0.03);
+                    //migrationList = migratorList;
+                    //break;
 
                     std::vector<std::tuple<int, int, Server::DeployNode>> applyList;
                     if (Migrator::applyMigration(migratorFactory, migratorList, applyList)) {
                         int _diff = migratorList.size() - applyList.size();
                         if (applyList.size() > limit) {
-                            migrationList = lastApplyList;
+                            if (lastApplyList.empty()) {
+                                migrationList = migratorList;
+                            } else {
+                                migrationList = lastApplyList;
+                            }
                             break;
                         }
                         if (_diff == lastDiff) {
@@ -204,6 +212,9 @@ public:
                         break;
                     }
                 }
+                if (migrationList.empty()) {
+                    migrationList = lastApplyList;
+                }
                 for (auto[vmID, serverID, node] : migrationList) {
                     auto[oldServer, oldNode] = Server::getDeployInfo(vmID);
                     auto vm = VM::getVM(vmID);
@@ -211,7 +222,6 @@ public:
                     Server::getServer(serverID)->deploy(vm, node);
                 }
             }
-            //std::clog << 4 << std::endl;
 
 #ifdef TEST
             checkUsedRate();
