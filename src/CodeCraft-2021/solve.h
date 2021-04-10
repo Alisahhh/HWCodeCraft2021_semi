@@ -7,7 +7,8 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
-#include <stdlib.h>
+#include <cstdlib>
+#include <exception>
 
 #include "data.h"
 #include "io.h"
@@ -17,6 +18,8 @@
 
 class Solver {
 public:
+    typedef KMeans<ServerType *> KMeansServer;
+
     Solver() {
         io = new StdIO();
         migrator = new Migrator(aliveMachineList);
@@ -100,20 +103,41 @@ public:
 
 #define TEST_KMEANS
 #ifdef TEST_KMEANS
-        auto *kMeans = new KMeans<ServerType *>;
+        auto *kMeans = new KMeansServer;
         std::vector<std::pair<std::vector<double>, ServerType *>> testData;
         for (auto &i : serverTypeList) {
-            testData.push_back({{(double) i->hardwareCost / i->energyCost}, i});
+            // FIXME:
+            testData.push_back({{i->hardwareCost / (i->cpu + i->memory * 0.45), i->energyCost / (i->cpu + i->memory * 0.45)}, i});
         }
         auto kMeansResultTmp = kMeans->kMeans(testData);
         delete kMeans;
         std::vector<std::set<ServerType *>> kMeansResult;
-        for (auto &i : kMeansResultTmp) {
-            std::set<ServerType *> tmp;
-            for (auto &obj : i) {
-                tmp.insert(obj.second);
+        std::vector<KMeansServer::Vector> kMeansResultPivot;
+        for (auto &cluster : kMeansResultTmp) {
+            if (kMeansResult.empty()) {
+                KMeansServer::Vector cent = KMeansServer::getCentroid(cluster, 2);
+                std::set<ServerType *> tmp;
+                for (auto &t : cluster) {
+                    tmp.insert(t.second);
+                }
+                kMeansResult.push_back(tmp);
+                kMeansResultPivot.push_back(cent);
+            } else {
+                KMeansServer::Vector cent = KMeans<ServerType *>::getCentroid(cluster, 2);
+                // FIXME:
+                if (fcmp(KMeansServer::distance(cent, *kMeansResultPivot.rbegin()) - 5) <= 0) {
+                    for (auto &t : cluster) {
+                        kMeansResult.rbegin()->insert(t.second);
+                    }
+                } else {
+                    std::set<ServerType *> tmp;
+                    for (auto &t : cluster) {
+                        tmp.insert(t.second);
+                    }
+                    kMeansResult.push_back(tmp);
+                    kMeansResultPivot.push_back(cent);
+                }
             }
-            kMeansResult.push_back(tmp);
         }
 #endif
 
@@ -152,7 +176,7 @@ public:
         std::vector<int> bestPMInDay(T+1, -1);
 
         for (int i=0;i<catPMCostInDaySim.size();i++){
-            if (catPMCostInDaySim.size() != kMeansSepareteCost.size()) throw error_t(-1);
+            //if (catPMCostInDaySim.size() != kMeansSepareteCost.size()) throw error_t(-1);
             catPMCostInDaySim[i] = kMeansSepareteCost[i].first;
         }
 
@@ -200,6 +224,7 @@ public:
             fprintf(stderr, "%lf %lf\n", kmc.first, kmc.second);
         }
         fprintf(stderr, "highExpDay %d\n", highExpDay);
+        fflush(stderr);
 #endif
 
         queryListK.resize(K);

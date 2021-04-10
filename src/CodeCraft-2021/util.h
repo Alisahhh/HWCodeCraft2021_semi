@@ -104,7 +104,7 @@ private:
 
     static const int MAX_ITER_COUNT = 1e4;
     volatile static const constexpr double EPS = 1e-2;
-    volatile static const constexpr double EPS_ADAPT_KMEANS = 50;
+    volatile static const constexpr double EPS_ADAPT_KMEANS = 20;
     static const int ITER_COUNT = 5;
 
     static int fcmp(double a) {
@@ -125,6 +125,7 @@ private:
         return cmpVector(a, b) < 0;
     }
 
+public:
     // 计算两向量间的欧氏距离
     static double distance(const Vector &a, const Vector &b) {
         if (a.empty() || b.empty()) throw std::logic_error("KMeans::distance: empty vector");
@@ -204,7 +205,6 @@ private:
         return getVariance(tmp);
     }
 
-public:
     // k-平均聚类算法
     std::vector<ObjectList> kMeans(const ObjectList &src, int k) {
         if (src.empty()) throw std::logic_error("KMeans::kMeans: empty list");
