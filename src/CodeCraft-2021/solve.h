@@ -170,11 +170,12 @@ public:
         int highExpDay = -1;
         // fprintf(stderr, "%d\n", minimumCostCat);
 
+        const double pmRunRate = 1.05;
         // for init day to T-1 day
         for (int simToday = T-1; simToday > 0; simToday--){
             // update total cost, if pm added in simToday day
             for (int i=0;i<catPMCostInDaySim.size();i++){
-                catPMCostInDaySim[i] += kMeansSepareteCost[i].second;
+                catPMCostInDaySim[i] += pmRunRate * kMeansSepareteCost[i].second;
                 // fprintf(stderr, "%lf\t",catPMCostInDaySim[i]);
             }
             // fprintf(stderr, "\n");
@@ -195,6 +196,9 @@ public:
 #endif
 
 #ifdef TEST
+        for (auto &kmc : kMeansSepareteCost) {
+            fprintf(stderr, "%lf %lf\n", kmc.first, kmc.second);
+        }
         fprintf(stderr, "highExpDay %d\n", highExpDay);
 #endif
 
@@ -257,6 +261,7 @@ public:
             const int kBest = 15;
 
             for(int i=0; i<std::min(K, kBest); i++){
+                if (day + i > T) continue;
                 calcVmAliveDays(queryListK[(day + i) % K], K, day+i);
             }
 
@@ -277,7 +282,7 @@ public:
                     (query->type == Query::Type::DEL || query->id == (*queryList.rbegin())->id)) {
                     for (auto &addQueryList : addQueryLists) {
                         std::sort(addQueryList.begin(), addQueryList.end(), compareAddQuery);
-                        handleAddQueries(addQueryList, purchaseList, 350);
+                        handleAddQueries(addQueryList, purchaseList, highExpDay);
                     }
 
                     // IO
