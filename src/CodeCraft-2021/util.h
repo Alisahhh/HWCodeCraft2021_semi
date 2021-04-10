@@ -104,7 +104,8 @@ private:
 
     static const int MAX_ITER_COUNT = 1e4;
     volatile static const constexpr double EPS = 1e-2;
-    volatile static const constexpr double EPS_ADAPT_KMEANS = 20;
+    volatile static const constexpr double EPS_ADAPT_KMEANS = 50;
+    static const int ITER_COUNT = 5;
 
     static int fcmp(double a) {
         if (fabs(a) < EPS) return 0;
@@ -251,13 +252,42 @@ public:
             }
         }
         std::sort(res.begin(), res.end(), [](const ObjectList &a, const ObjectList &b) {
+            if (a.empty()) return true;
+            if (b.empty()) return false;
             return cmpVectorForSort(a[0].first, b[0].first);
         });
         return res;
     }
 
-    // 自适应 k-平均聚类算法
     std::vector<ObjectList> kMeans(const ObjectList &src) {
+        double minVar = 1e9;
+        std::vector<ObjectList> list;
+        for (int i = 0; i < ITER_COUNT; i++) {
+            auto result = kMeansBi(src);
+            double var = 0;
+            for (auto &t : result) {
+                var += getVariance(t);
+            }
+            var /= result.size();
+            if (var < minVar) {
+                minVar = var;
+                list = result;
+            }
+        }
+        return list;
+    }
+
+private:
+    double testK(const ObjectList &src, int k) {
+        auto result = kMeans(src, k);
+        double varAvg = 0;
+        for (auto &cluster : result) {
+            varAvg += getVariance(cluster);
+        }
+        return varAvg / k;
+    }
+
+    std::vector<ObjectList> kMeansBi(const ObjectList &src) {
         int l = 1, r = src.size();
         double rVarAvg = testK(src, r);
         while (r - l > 1) {
@@ -271,15 +301,5 @@ public:
             }
         }
         return kMeans(src, r);
-    }
-
-private:
-    double testK(const ObjectList &src, int k) {
-        auto result = kMeans(src, k);
-        double varAvg = 0;
-        for (auto &cluster : result) {
-            varAvg += getVariance(cluster);
-        }
-        return varAvg;
     }
 };
