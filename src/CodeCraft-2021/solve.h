@@ -194,6 +194,7 @@ public:
         int highExpDay = -1;
         // fprintf(stderr, "%d\n", minimumCostCat);
 
+        // FIXME:
         const double pmRunRate = 1.05;
         // for init day to T-1 day
         for (int simToday = T-1; simToday > 0; simToday--){
@@ -640,8 +641,8 @@ private:
                         #ifdef TEST
                             int resetCPU = minAlivm->getLeftCPU() - vm->cpu;
                             int resetMem = minAlivm->getLeftMemory() - vm->memory;
-                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(), minAlivm->getLeftMemory(), 
-                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU() + 0.0) /  minAlivm->getLeftMemory(), (resetCPU + 0.0) / resetMem);
+                            // fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(), minAlivm->getLeftMemory(), 
+                            // resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU() + 0.0) /  minAlivm->getLeftMemory(), (resetCPU + 0.0) / resetMem);
                             
                         #endif
                         minAlivm->deploy(vm, Server::DUAL_NODE);
@@ -707,8 +708,8 @@ private:
                         #ifdef TEST
                             int resetCPU = minAlivm->getLeftCPU(lastType) - vm->cpu;
                             int resetMem = minAlivm->getLeftMemory(lastType) - vm->memory;
-                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(lastType), minAlivm->getLeftMemory(lastType), 
-                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU(lastType) + 0.0) /  minAlivm->getLeftMemory(lastType), (resetCPU + 0.0) / resetMem);
+                            // fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf\n", vm->cpu, vm->memory, minAlivm->getLeftCPU(lastType), minAlivm->getLeftMemory(lastType), 
+                            // resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (minAlivm->getLeftCPU(lastType) + 0.0) /  minAlivm->getLeftMemory(lastType), (resetCPU + 0.0) / resetMem);
                             
                         #endif
                         minAlivm->deploy(vm, lastType);
@@ -804,8 +805,8 @@ private:
                         #ifdef TEST
                             int resetCPU = aliveM->getLeftCPU() - vm->cpu;
                             int resetMem = aliveM->getLeftMemory() - vm->memory;
-                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(), aliveM->getLeftMemory(), 
-                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU() + 0.0) /  aliveM->getLeftMemory(), (resetCPU + 0.0) / resetMem);
+                            // fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(), aliveM->getLeftMemory(), 
+                            // resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU() + 0.0) /  aliveM->getLeftMemory(), (resetCPU + 0.0) / resetMem);
                             
                         #endif
                         aliveM->deploy(vm);
@@ -820,8 +821,8 @@ private:
                         #ifdef TEST
                             int resetCPU = aliveM->getLeftCPU(Server::NODE_0) - vm->cpu;
                             int resetMem = aliveM->getLeftMemory(Server::NODE_0) - vm->memory;
-                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_0), aliveM->getLeftMemory(Server::NODE_0), 
-                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_0) + 0.0) /  aliveM->getLeftMemory(Server::NODE_0), (resetCPU + 0.0) / resetMem);
+                            // fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_0), aliveM->getLeftMemory(Server::NODE_0), 
+                            // resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_0) + 0.0) /  aliveM->getLeftMemory(Server::NODE_0), (resetCPU + 0.0) / resetMem);
                             
                         #endif
                         aliveM->deploy(vm, Server::NODE_0);
@@ -832,8 +833,8 @@ private:
                         #ifdef TEST
                             int resetCPU = aliveM->getLeftCPU(Server::NODE_1) - vm->cpu;
                             int resetMem = aliveM->getLeftMemory(Server::NODE_1) - vm->memory;
-                            fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_1), aliveM->getLeftMemory(Server::NODE_1), 
-                            resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_1) + 0.0) /  aliveM->getLeftMemory(Server::NODE_1), (resetCPU + 0.0) / resetMem);
+                            // fprintf(stderr, "%4d %4d %4d %4d %4d %4d %4lf %4lf %4lf buy\n", vm->cpu, vm->memory, aliveM->getLeftCPU(Server::NODE_1), aliveM->getLeftMemory(Server::NODE_1), 
+                            // resetCPU, resetMem, (vm->cpu + 0.0) / vm->memory, (aliveM->getLeftCPU(Server::NODE_1) + 0.0) /  aliveM->getLeftMemory(Server::NODE_1), (resetCPU + 0.0) / resetMem);
                             
                         #endif
                         aliveM->deploy(vm, Server::NODE_1);

@@ -104,6 +104,7 @@ private:
 
     static const int MAX_ITER_COUNT = 1e4;
     volatile static const constexpr double EPS = 1e-2;
+    // TODO:
     volatile static const constexpr double EPS_ADAPT_KMEANS = 20;
     static const int ITER_COUNT = 5;
 
