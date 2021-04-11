@@ -243,8 +243,8 @@ public:
                 if (flagCountingDelete >= 0 && !flagNoLimitUsed) {
                     if (lastDeleteCnt == -1) {
                         lastDeleteCnt = deleteCnt;
-                    } else if (deleteCnt > 400 || flagCountingDelete > 20) {
-                        limit = VM::getVMCount();
+                    } else if (deleteCnt > 400 || flagCountingDelete > 20) { // FIXME: deleteCnt threshold
+                        limit = VM::getVMCount(); // set unlimited
                         flagNoLimitUsed = true;
                     } else {
                         lastDeleteCnt = deleteCnt;
