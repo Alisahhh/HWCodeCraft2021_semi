@@ -152,7 +152,7 @@ public:
         std::vector<int> bestPMInDay(T+1, -1);
 
         for (int i=0;i<catPMCostInDaySim.size();i++){
-            if (catPMCostInDaySim.size() != kMeansSepareteCost.size()) throw error_t(-1);
+            //if (catPMCostInDaySim.size() != kMeansSepareteCost.size()) throw error_t(-1);
             catPMCostInDaySim[i] = kMeansSepareteCost[i].first;
         }
 
