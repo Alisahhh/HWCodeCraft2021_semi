@@ -173,6 +173,8 @@ private:
     long long hardwareCost = 0; // DEBUG USE
     long long totalCost = 0; // DEBUG USE
     std::vector<std::vector<Query *>> queryListK;
+    static constexpr int LARGE_MACHINE_SINGLE = 80;
+    static constexpr int LARGE_MACHINE_DUAL = 80;
 
     StdIO *io;
     CommonData *commonData;
@@ -189,6 +191,30 @@ private:
 
     static bool compareAddQuery(const std::pair<VMType *, Query *> &a, const std::pair<VMType *, Query *> &b) {
         auto vmA = a.first, vmB = b.first;
+        if(vmA->deployType == VM::SINGLE) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE && vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_SINGLE) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_SINGLE) {
+                return 0;
+            }
+        }
+
+        if(vmA->deployType == VM::DUAL) {
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL && vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return vmA->category < vmB->category;
+            }
+            if(vmA->cpu + vmA->memory > LARGE_MACHINE_DUAL) {
+                return 1;
+            }
+            if(vmB->cpu + vmB->memory > LARGE_MACHINE_DUAL) {
+                return 0;
+            }
+        }
+
         if (vmA->category != vmB->category) {
             return vmA->category < vmB->category;
         }
@@ -205,6 +231,7 @@ private:
 
     std::vector<ServerType *> machineListForSort;
     std::unordered_map<int, Server *> aliveMachineList[2];
+    int pmCatHERateSpace = 6;
 
     void handleAddQueries(const std::vector<std::pair<VMType *, Query *>> &addQueryList,
                           std::vector<Server *> &purchaseList) {
@@ -239,12 +266,18 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
-                                      } else {
-                                          return fcmp(absKa - absKb) < 0;
-                                      }
+                                          if(day > T / 3) {
+                                              int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                                            int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
+                                            if(aK == bK) {
+                                           return a->hardwareCost < b->hardwareCost;
+                        } else {
+                            return aK < bK;
+                        }
+                                          }
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
+                                      
                                   }
                               } else if (vm->category == Category::MORE_CPU) {
                                   if (a->category != b->category) {
@@ -256,12 +289,21 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
-                                          return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
-                                                      (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
-                                      } else {
-                                          return fcmp(absKa - absKb) < 0;
-                                      }
+                                    //   if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
+                                          if(day > T / 3) {
+                                              int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
+                        if(aK == bK) {
+                            return a->hardwareCost < b->hardwareCost;
+                        } else {
+                            return aK < bK;
+                        }
+                                          }
+                                          return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
+                                                      (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
+                                    //   } else {
+                                    //       return fcmp(absKa - absKb) < 0;
+                                    //   }
                                   }
                               } else if (vm->category == Category::MORE_MEMORY) {
                                   if (a->category != b->category) {
@@ -273,12 +315,21 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
+                                    //   if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
+                                          if(day > T / 3) {
+                                              int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
+                        int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
+                        if(aK == bK) {
+                            return a->hardwareCost < b->hardwareCost;
+                        } else {
+                            return aK < bK;
+                        }
+                                          }
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
-                                      } else {
-                                          return fcmp(absKa - absKb) < 0;
-                                      }
+                                    //   } else {
+                                    //       return fcmp(absKa - absKb) < 0;
+                                    //   }
                                   }
 
                               }
