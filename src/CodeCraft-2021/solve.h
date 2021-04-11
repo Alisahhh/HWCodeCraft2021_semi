@@ -239,7 +239,7 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 0.5) < 0 && fcmp(absKb - 0.5) < 0) {
+                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
@@ -256,7 +256,7 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 2) < 0 && fcmp(absKb - 2) < 0) {
+                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day) * param)) < 0;
                                       } else {
@@ -273,7 +273,7 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                      if (fcmp(absKa - 0.2) < 0 && fcmp(absKb - 0.2) < 0) {
+                                      if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
                                           return fcmp((a->hardwareCost + a->energyCost * (T - day + 1) * param) -
                                                       (b->hardwareCost + b->energyCost * (T - day + 1) * param)) < 0;
                                       } else {
