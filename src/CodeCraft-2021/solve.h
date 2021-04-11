@@ -241,7 +241,7 @@ public:
                 // FIXME:
                 limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.3);
                 // FIXME:
-                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.03);
+                limit -= migrator->migrateScatteredVM(day, limit, migrationList, 0.05);
                 lastDayLeftMigCnt = limit;
             }
 
@@ -261,7 +261,7 @@ public:
             vmDieInK.clear();
             vmAddRecordInK.clear();
 
-            const int kBest = 15;
+            const int kBest = 17;
 
             for(int i=0; i<std::min(K, kBest); i++){
                 if (day + i > T) continue;
@@ -444,7 +444,7 @@ private:
 
         calcQueryListResource(addQueryList);
         // FIXME:
-        volatile double param = 1.6;
+        volatile double param = 1.5;
         if (isPeak) param = 1.0;
         auto deployType = addQueryList[0].first->deployType;
         if(dailyMaxMemInPerType[deployType][1] != 0)

@@ -1120,7 +1120,7 @@ class Migrator {
                         continue;
                     }
                     // FIXME:
-                    /*
+                    
                     if (curPM->getCategory(Server::DUAL_NODE) == vm->category) {
                         remainResourceWeightedSum =
                             getRemainResourceWeightedSum(curPM, vm);
@@ -1134,13 +1134,13 @@ class Migrator {
                             minusCnt++;
                         }
                     }
-                    */
+                    /*
                    if (targetPMId < 0 || compareAliveM(curPM, Server::getServer(targetPMId), vm, ServerType::DUAL_NODE, ServerType::DUAL_NODE) < 0){
                        targetPMId = curPM->id;
                        targetType = ServerType::DUAL_NODE;
                        position = i;
                        minusCnt++;
-                   }
+                   }*/
                 }
             }
         } else if (deployType == VMType::SINGLE) {
