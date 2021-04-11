@@ -263,7 +263,7 @@ private:
         for (auto it = addQueryList.begin(); it != addQueryList.end(); it++) {
             auto vmType = it->first;
             auto query = it->second;
-            volatile double param = 1.2;
+            volatile double param = 1.4;
             if (isPeak) param = 1.0;
             auto vm = VM::newVM(query->vmID, *vmType);
             if (it == addQueryList.begin() || vm->category != (it - 1)->first->category) {
@@ -287,7 +287,7 @@ private:
                                       }
                                       return a->category < b->category;
                                   } else {
-                                          if(day > T / 3) {
+                                          if(day > T / 2) {
                                               int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
                                             int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                                             if(aK == bK) {
@@ -311,7 +311,7 @@ private:
                                       return a->category < b->category;
                                   } else {
                                     //   if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
-                                          if(day > T / 3) {
+                                          if(day > T / 2) {
                                               int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                         if(aK == bK) {
@@ -337,7 +337,7 @@ private:
                                       return a->category < b->category;
                                   } else {
                                     //   if (fcmp(absKa - 100) < 0 && fcmp(absKb - 100) < 0) {
-                                          if(day > T / 3) {
+                                          if(day > T / 2) {
                                               int aK = ((a->hardwareCost) / (a->energyCost)) >> pmCatHERateSpace;
                         int bK = ((b->hardwareCost) / (b->energyCost)) >> pmCatHERateSpace;
                         if(aK == bK) {
