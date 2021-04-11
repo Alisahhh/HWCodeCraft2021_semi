@@ -212,6 +212,9 @@ public:
         time_t startTime, endTime, timeSum = 0; // DEBUG USE
         time_t migTimeSum = 0; // DEBUG USE
         startTime = clock(); // DEBUG USE
+        int deleteCnt = 0, lastDeleteCnt = -1;
+        bool flagNoLimitUsed = false;
+        int flagCountingDelete = -1;
         for (day = 1; day <= T; day++) {
 #ifdef TEST
             //if (day % 100 == 0) std::clog << "DAY " << day << std::endl;
@@ -228,11 +231,26 @@ public:
             std::vector<std::tuple<int, int, Server::DeployNode>> migrationList; // 0: vmID, 1: serverID, 2: deployNode
             std::vector<std::pair<Server *, Server::DeployNode>> deployList;
 
+
+
             static int lastDayLeftMigCnt = 0;
             //if(isPeak) lastDayLeftMigCnt = 0;
             // migration
             if (VM::getVMCount() > 100) {
                 auto limit = VM::getVMCount() * 3 / 100; // 百分之3
+
+                // do unlimited migration
+                if (flagCountingDelete >= 0 && !flagNoLimitUsed) {
+                    if (lastDeleteCnt == -1) {
+                        lastDeleteCnt = deleteCnt;
+                    } else if (deleteCnt > 400 || flagCountingDelete > 20) {
+                        limit = VM::getVMCount();
+                        flagNoLimitUsed = true;
+                    } else {
+                        lastDeleteCnt = deleteCnt;
+                    }
+                }
+
                 // limit = INT32_MAX;
                 //limit -= migrator->clearHighExpensesPMs(day, lastDayLeftMigCnt*1.2, migrationList);
                 //limit -= migrator->combineLowLoadRatePM(day, limit, migrationList, 0.7);
@@ -270,6 +288,8 @@ public:
 
             std::vector<std::pair<VMType *, Query *>> addQueryLists[2];
             bool flagAddQueriesEmpty = true;
+            if (isPeak) flagCountingDelete = 0;
+            if (flagCountingDelete >= 0) deleteCnt = 0;
             for (const auto &query : queryList) {
                 VMType *vmType = nullptr;
                 if (query->type == Query::Type::ADD) vmType = commonData->getVMType(query->vmModel);
@@ -311,6 +331,7 @@ public:
 
                 // 处理删除请求
                 if (query->type == Query::Type::DEL) {
+                    if (flagCountingDelete >= 0) deleteCnt++;
                     auto vm = VM::getVM(query->vmID);
                     //fprintf(stderr, "del %d %d %d %d %d\n",vm->id, vmAddRecord[vm->id].second, day, day -vmAddRecord[vm->id].second, vmAddRecord[vm->id].first);
                     if(vmAddRecord[vm->id].first == true && day -vmAddRecord[vm->id].second < 100){
@@ -321,6 +342,8 @@ public:
                     VM::removeVM(vm->id);
                 }
             }
+
+            if (flagCountingDelete >= 0) flagCountingDelete++;
 
             // 回收内存
             for (const auto &query : queryList) {
